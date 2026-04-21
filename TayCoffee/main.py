@@ -5,7 +5,7 @@ from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
 from controllers.admin_controller import admin_bp
 from controllers.admin_api_controller import admin_api_bp
-from controllers.shipper_controller import shipper_bp
+from controllers.cashier_controller import cashier_bp
 from controllers.customer_controller import customer_bp
 from controllers.auth_controller import auth_bp, handle_social_login
 from boundaries.api_routes import api_bp
@@ -25,9 +25,6 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')  # Bắt buộc
 # Provide Mapbox token to all templates
 
 
-@app.context_processor
-def inject_mapbox_token():
-    return dict(mapbox_access_token=os.getenv('MAPBOX_ACCESS_TOKEN'))
 
 
 # Enable CORS for all routes (allow frontend to call API)
@@ -55,7 +52,7 @@ google = oauth.register(
 
 # Đăng ký Blueprints (Controllers & Boundaries)
 app.register_blueprint(admin_bp)
-app.register_blueprint(shipper_bp)
+app.register_blueprint(cashier_bp)
 app.register_blueprint(customer_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(api_bp)

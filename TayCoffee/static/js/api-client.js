@@ -241,10 +241,29 @@ class APIClient {
   }
 
   /**
-   * Get health check
-   * GET /api/health
+   * Update table status
+   * PUT /api/admin/tables/{id}
    */
-  static async health() {
+  static async updateTableStatus(tableId, status) {
+    try {
+      const res = await fetch(`${API_BASE}/admin/tables/${tableId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const text = await res.text();
+      if (!text) throw new Error("Empty response from server");
+      const data = JSON.parse(text);
+      if (!res.ok) throw new Error(data.error || "Failed to update table");
+      return data;
+    } catch (err) {
+      console.error("Update table error:", err);
+      throw err;
+    }
+  }
+
+  /**
+   * Get health check
     try {
       const res = await fetch(`${API_BASE}/health`);
       const data = await res.json();

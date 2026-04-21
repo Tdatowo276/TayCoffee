@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cashier Deck | Tày Coffee Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <style>
+    :root {
+      --sidebar-w: 280px;
+      --glass-bg: rgba(26, 17, 13, 0.6);
+      --glass-border: rgba(234, 198, 150, 0.1);
+    }
+
+    body {
+      background: var(--bg-deep);
+      color: var(--white);
+      font-family: var(--font-body);
+      overflow-x: hidden;
+    }
+
+    /* Layout */
+    .admin-container {
+      display: flex;
+      min-height: 100vh;
+      padding-top: var(--nav-h);
+    }
+
+    /* Sidebar */
+    .a-sidebar {
+      width: var(--sidebar-w);
+      background: var(--bg-surface);
+      border-right: 1px solid var(--glass-border);
+      padding: 40px 24px;
+      position: fixed;
+      top: var(--nav-h);
+      bottom: 0;
+      z-index: 10;
+      transition: var(--transition);
+    }
+
+    .sidebar-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--gold);
+      opacity: 0.6;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .sidebar-title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      margin-bottom: 40px;
+      color: var(--white);
+    }
+
+    .a-nav-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .a-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      color: rgba(255, 255, 255, 0.6);
+      text-decoration: none;
+      font-weight: 600;
+      border-radius: 12px;
+      transition: var(--transition);
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .a-nav-item:hover {
+      background: rgba(234, 198, 150, 0.05);
+      color: var(--white);
+    }
+
+    .a-nav-item.active {
+      background: rgba(234, 198, 150, 0.1);
+      border-color: rgba(234, 198, 150, 0.2);
+      color: var(--gold);
+    }
+
+    .a-nav-icon {
+      font-size: 18px;
+    }
+
+    /* Main Content */
+    .a-main {
+      flex: 1;
+      margin-left: var(--sidebar-w);
+      padding: 40px clamp(24px, 5vw, 60px);
+      background: 
+        radial-gradient(circle at 80% 20%, rgba(234, 198, 150, 0.05), transparent 40%),
+        var(--bg-deep);
+    }
+
+    .a-panel {
+      display: none;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    .a-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Panel Card */
+    .panel-card {
+      background: var(--glass-bg);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 32px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      margin: 0;
+      color: var(--white);
+    }
+
+    /* Searching */
+    .search-wrapper {
+      position: relative;
+      width: 320px;
+    }
+
+    .search-wrapper i {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--gold);
+      opacity: 0.6;
+    }
+
+    .search-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px 16px 12px 44px;
+      border-radius: 12px;
+      color: var(--white);
+      font-family: var(--font-body);
+      transition: var(--transition);
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--gold);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 0 4px rgba(234, 198, 150, 0.1);
+    }
+
+    /* Table */
+    .a-table-container {
+      overflow-x: auto;
+    }
+
+    .a-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .a-table th {
+      padding: 16px 20px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--gold);
+      border-bottom: 2px solid var(--glass-border);
+      font-weight: 700;
+    }
+
+    .a-table td {
+      padding: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.9);
+      vertical-align: middle;
+    }
+
+    .a-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Badges */
+    .sbadge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .sbadge-warning { background: rgba(234, 198, 150, 0.15); color: var(--gold); }
+    .sbadge-info { background: rgba(52, 152, 219, 0.15); color: #3498db; }
+    .sbadge-success { background: rgba(46, 204, 113, 0.15); color: #2ecc71; }
+    .sbadge-danger { background: rgba(231, 76, 60, 0.15); color: #e74c3c; }
+
+    /* Inputs in table */
+    .status-select {
+      background: rgba(15, 10, 8, 0.8);
+      border: 1px solid var(--glass-border);
+      color: var(--white);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+
+    .status-select:focus {
+      border-color: var(--gold);
+      outline: none;
+    }
+
+    /* Actions */
+    .abtn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      border: 1px solid transparent;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .abtn-view {
+      background: rgba(234, 198, 150, 0.1);
+      color: var(--gold);
+      border-color: rgba(234, 198, 150, 0.2);
+    }
+
+    .abtn-view:hover {
+      background: var(--gold);
+      color: var(--black);
+    }
+
+    .abtn-edit {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--white);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .abtn-edit:hover {
+        background: var(--white);
+        color: var(--black);
+    }
+
+    /* Modal Dark Overrides */
+    .modal {
+      background: var(--bg-surface) !important;
+      border: 1px solid var(--glass-border) !important;
+      box-shadow: 0 30px 100px rgba(0,0,0,0.8) !important;
+    }
+
+    .modal-header {
+      border-bottom: 1px solid var(--glass-border) !important;
+    }
+
+    .modal-body label.muted {
+      color: var(--gold);
+      opacity: 0.7;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .detail-value {
+      font-family: var(--font-body);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--white);
+    }
+
+    /* Navbar Extra */
+    #navbar.scrolled {
+      background: rgba(15, 10, 8, 0.9);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    #admin-name {
+      padding: 6px 12px;
+      background: rgba(234, 198, 150, 0.1);
+      border-radius: 8px;
+      border: 1px solid rgba(234, 198, 150, 0.2);
+    }
+
+  </style>
+</head>
+<body class="admin-theme">
+  <!-- NAVBAR -->
+  <nav id="navbar" class="scrolled">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="/" class="nav-logo">TÀY<span>COFFEE</span><div class="logo-dot"></div></a>
+        <div style="font-family:var(--font-display);font-size:16px;letter-spacing:5px;text-transform:uppercase;color:var(--gold);font-weight:700;">
+            CASHIER <span style="color:var(--white);opacity:0.6">DECK</span>
+        </div>
+        <div class="nav-actions">
+          <div id="admin-name" style="font-family:var(--font-body);font-size:14px;color:var(--gold);font-weight:600">
+            <i class="fa-solid fa-user-tie" style="margin-right:8px"></i>Thu ngân
+          </div>
+          <button class="nav-icon-btn" onclick="logout()" title="Logout" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1)">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div id="toast-container"></div>
+
+  <div class="admin-container">
+    <!-- SIDEBAR -->
+    <aside class="a-sidebar">
+      <div class="sidebar-brand">
+        <span class="sidebar-label">Operational</span>
+        <h2 class="sidebar-title">Front-of-House</h2>
+      </div>
+      <div class="a-nav-list">
+        <a class="a-nav-item active" onclick="showPanel('orders', this)">
+          <i class="fa-solid fa-box-archive a-nav-icon"></i> Đơn hàng
+        </a>
+        <a class="a-nav-item" onclick="showPanel('tables', this)">
+          <i class="fa-solid fa-chair a-nav-icon"></i> Quản lý Bàn
+        </a>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="a-main">
+      <!-- ORDERS PANEL -->
+      <div class="a-panel active" id="panel-orders">
+        <div class="panel-card">
+          <div class="panel-header">
+            <h2 class="panel-title">Danh sách Đơn hàng</h2>
+            <div class="search-wrapper">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input class="search-input" type="text" placeholder="Tìm tên khách, mã đơn..." oninput="debouncedFilterTable('orders-body', this.value)">
+            </div>
+          </div>
+          
+          <div class="a-table-container">
+            <table class="a-table">
+              <thead>
+                <tr>
+                  <th>Mã đơn</th>
+                  <th>Khách hàng</th>
+                  <th>Sản phẩm</th>
+                  <th>Tổng cộng</th>
+                  <th>Số bàn</th>
+                  <th>Trạng thái</th>
+                  <th>Thời gian</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="orders-body">
+                <!-- Spoken by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABLES PANEL -->
+      <div class="a-panel" id="panel-tables">
+        <div class="panel-card">
+          <div class="panel-header">
+            <h2 class="panel-title">Quản lý Bàn & Chỗ ngồi</h2>
+            <div class="search-wrapper">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input class="search-input" type="text" placeholder="Tìm số bàn..." oninput="debouncedFilterTable('tables-body', this.value)">
+              </div>
+          </div>
+          
+          <div class="a-table-container">
+            <table class="a-table">
+              <thead>
+                <tr>
+                  <th>Số bàn</th>
+                  <th>Sức chứa</th>
+                  <th>Trạng thái hiện tại</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody id="tables-body">
+                <!-- Spoken by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ORDER DETAIL MODAL -->
+  <div class="modal-overlay hidden" id="order-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="panel-title" style="font-size:22px">Chi tiết Đơn hàng</h2>
+        <button class="modal-close" onclick="closeOrderModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px">
+            <div>
+                <label class="muted">Mã định danh</label>
+                <div class="detail-value" id="order-detail-id">-</div>
+            </div>
+            <div>
+                <label class="muted">Tên khách hàng</label>
+                <div class="detail-value" id="order-detail-customer">-</div>
+            </div>
+            <div>
+                <label class="muted">Vị trí / Số bàn</label>
+                <div class="detail-value" id="order-detail-shipper">-</div>
+            </div>
+            <div>
+                <label class="muted">Tổng giá trị đơn</label>
+                <div class="detail-value" id="order-detail-total" style="color:var(--gold)">0₫</div>
+            </div>
+        </div>
+        
+        <div style="margin-top:24px">
+            <label class="muted">Danh sách món</label>
+            <div class="detail-value" id="order-detail-items" style="background:rgba(255,255,255,0.03); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); font-weight:400; line-height:1.6">-</div>
+        </div>
+        
+        <div style="margin-top:24px">
+            <label class="muted">Ghi chú phục vụ</label>
+            <div class="detail-value" id="order-detail-notes" style="font-style:italic; opacity:0.8">-</div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:20px; border-top:1px solid var(--glass-border); text-align:right">
+          <button class="btn btn-primary" onclick="closeOrderModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api-client.js"></script>
+  <script src="/static/js/cashier.js"></script>
+  <script>
+    function logout() { localStorage.clear(); window.location.href = '/'; }
+    
+    // Smooth filter
+    function debouncedFilterTable(id, val) {
+        const rows = document.getElementById(id).getElementsByTagName('tr');
+        const query = val.toLowerCase();
+        for (let row of rows) {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(query) ? '' : 'none';
+        }
+    }
+  </script>
+</body>
+</html>

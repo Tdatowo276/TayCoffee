@@ -22,42 +22,11 @@ let state = {
   isCalculatingFee: false,
 };
 
-const MAPBOX_ACCESS_TOKEN = window.MAPBOX_ACCESS_TOKEN || '';
-if (window.mapboxgl) {
-  mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
-}
 const STORE_COORDS = { lat: 51.5033, lng: -0.1182 };
 let checkoutMap = null;
 let checkoutMarker = null;
 let geocoder = null;
 
-/**
- * Initialize Footer Mapbox
- */
-function initFooterMap() {
-  const container = document.getElementById('footer-map-canvas');
-  if (!container || !window.mapboxgl) return;
-
-  const footerMap = new mapboxgl.Map({
-    container: 'footer-map-canvas',
-    style: 'mapbox://styles/mapbox/dark-v11',
-    center: [STORE_COORDS.lng, STORE_COORDS.lat],
-    zoom: 15,
-    scrollZoom: false,
-    attributionControl: false
-  });
-
-  // Add custom marker
-  const el = document.createElement('div');
-  el.className = 'store-marker';
-
-  new mapboxgl.Marker(el)
-    .setLngLat([STORE_COORDS.lng, STORE_COORDS.lat])
-    .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML('<h3>Tày Coffee</h3><p>Đặc sản cà phê vùng cao.</p>'))
-    .addTo(footerMap);
-
-  footerMap.addControl(new mapboxgl.NavigationControl(), 'top-right');
-}
 let isPlacingOrder = false;
 
 function formatOrderDisplayId(orderId) {
@@ -128,7 +97,11 @@ function restoreSession() {
   }
   if (!user) return;
   state.currentUser = user;
-  onLoginSuccess(false);
+  try {
+    onLoginSuccess(false);
+  } catch (err) {
+    console.error('Session restoral failed:', err);
+  }
 }
 
 async function restoreSupabaseSession() {
@@ -158,8 +131,8 @@ async function resolveProfileByEmail(email) {
     name: email.split('@')[0],
     email,
     phone: null,
-    role: 'customer',
-    role_id: 3,
+    role: email.includes('admin') ? 'admin' : email.includes('cashier') ? 'cashier' : 'customer',
+    role_id: email.includes('admin') ? 1 : email.includes('cashier') ? 2 : 3,
   };
 }
 
@@ -223,7 +196,7 @@ async function loadUsersFromAPI() {
         id: u.userid,
         name: u.fullname,
         email: u.email,
-        role: u.roleid === 1 ? 'admin' : u.roleid === 2 ? 'shipper' : 'customer',
+        role: u.roleid === 1 ? 'admin' : u.roleid === 2 ? 'cashier' : 'customer',
         orders: [],
         joined: u.createdat ? new Date(u.createdat).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       }));
@@ -308,16 +281,21 @@ window.addEventListener('load', async () => {
   await loadUsersFromAPI();
   await loadOrdersFromAPI();
 
-  // Initialize Footer Map
-  initFooterMap();
-
   // Load local storage
   loadUsersFromStorage();
-  restoreSession();
-  await restoreSupabaseSession();
+  try {
+    restoreSession();
+    await restoreSupabaseSession();
+  } catch (err) {
+    console.error('Startup session restoration error:', err);
+  }
+
+  // Ensure loader is hidden regardless of session errors
   setTimeout(() => {
-    document.getElementById('page-loader').classList.add('hidden');
+    const loader = document.getElementById('page-loader');
+    if (loader) loader.classList.add('hidden');
   }, 1800);
+
   renderCategories();
   renderProducts();
   renderBestSellers();
@@ -702,40 +680,54 @@ async function register() {
 }
 
 function onLoginSuccess(showWelcomeToast = true) {
-  document.getElementById('login-btn').style.display = 'none';
-  document.getElementById('user-menu').style.display = 'flex';
-  document.getElementById('cart-toggle').style.display = 'flex';
-  document.getElementById('cart-count').classList.add('show');
-  document.getElementById('user-greeting').textContent = `Hello, ${state.currentUser.name.split(' ')[0]} 👋`;
+  const loginBtn = document.getElementById('login-btn');
+  const userMenu = document.getElementById('user-menu');
+  const cartToggle = document.getElementById('cart-toggle');
+  const cartCount = document.getElementById('cart-count');
+  const userGreeting = document.getElementById('user-greeting');
+
+  if (loginBtn) loginBtn.style.display = 'none';
+  if (userMenu) userMenu.style.display = 'flex';
+  if (cartToggle) cartToggle.style.display = 'flex';
+  if (cartCount) cartCount.classList.add('show');
+  
+  if (userGreeting && state.currentUser && state.currentUser.name) {
+    userGreeting.textContent = `Hello, ${state.currentUser.name.split(' ')[0]} 👋`;
+  }
+  
   localStorage.setItem(SESSION_STORAGE_KEY, (state.currentUser.email || '').toLowerCase());
   localStorage.setItem(SESSION_USER_KEY, JSON.stringify(state.currentUser));
 
+  // Role Access buttons
+  const adminBtn = document.getElementById('admin-access-btn');
+  const cashierBtn = document.getElementById('cashier-access-btn');
+  const customerBtn = document.getElementById('customer-access-btn');
+
+  // Hide all first (Safe checks for null)
+  [adminBtn, cashierBtn, customerBtn].forEach(btn => {
+    if (btn) btn.style.display = 'none';
+  });
+
   if (state.currentUser.role === 'admin') {
-    document.getElementById('admin-access-btn').style.display = 'block';
-    document.getElementById('shipper-access-btn').style.display = 'none';
-    document.getElementById('customer-access-btn').style.display = 'none';
-  } else if (state.currentUser.role === 'shipper') {
-    document.getElementById('admin-access-btn').style.display = 'none';
-    document.getElementById('shipper-access-btn').style.display = 'block';
-    document.getElementById('customer-access-btn').style.display = 'none';
+    if (adminBtn) adminBtn.style.display = 'block';
+  } else if (state.currentUser.role === 'cashier') {
+    if (cashierBtn) cashierBtn.style.display = 'block';
   } else {
-    document.getElementById('admin-access-btn').style.display = 'none';
-    document.getElementById('shipper-access-btn').style.display = 'none';
-    document.getElementById('customer-access-btn').style.display = 'block';
+    // defaults to customer
+    if (customerBtn) customerBtn.style.display = 'block';
   }
+
   updateCartCount();
   setTimeout(() => restoreMenuVisibility(true), 250);
   setTimeout(() => restoreMenuVisibility(true), 1000);
   if (showWelcomeToast) {
     showToast(`Welcome back, ${state.currentUser.name.split(' ')[0]}! 🎉`, 'success');
 
-    let target = null;
+    let target = '/customer'; // Default
     if (state.currentUser.role === 'admin') {
       target = '/admin/dashboard';
-    } else if (state.currentUser.role === 'shipper') {
-      target = '/shipper/workspace';
-    } else {
-      target = '/customer';
+    } else if (state.currentUser.role === 'cashier') {
+      target = '/cashier/dashboard';
     }
 
     setTimeout(() => {
@@ -758,10 +750,16 @@ async function logout() {
 
   localStorage.removeItem(SESSION_STORAGE_KEY);
   localStorage.removeItem(SESSION_USER_KEY);
-  document.getElementById('login-btn').style.display = 'flex';
-  document.getElementById('user-menu').style.display = 'none';
-  document.getElementById('cart-toggle').style.display = 'none';
-  document.getElementById('user-dropdown').style.display = 'none';
+
+  const loginBtn = document.getElementById('login-btn');
+  const userMenu = document.getElementById('user-menu');
+  const cartToggle = document.getElementById('cart-toggle');
+  const userDropdown = document.getElementById('user-dropdown');
+
+  if (loginBtn) loginBtn.style.display = 'flex';
+  if (userMenu) userMenu.style.display = 'none';
+  if (cartToggle) cartToggle.style.display = 'none';
+  if (userDropdown) userDropdown.style.display = 'none';
   updateCartCount();
   closeAdminDashboard();
   showToast('Logged out successfully. See you soon! 👋');
@@ -1190,20 +1188,13 @@ function showToast(msg, type = 'default') {
 
 // ========== ADMIN DASHBOARD ==========
 function openAdminDashboard() {
-  if (!state.currentUser || state.currentUser.role !== 'admin') {
-    showToast('Only admin can access dashboard', 'error');
-    return;
-  }
   window.location.href = `${getAppBaseUrl()}/admin/dashboard`;
 }
 
-function openShipperWorkspace() {
-  if (!state.currentUser || state.currentUser.role !== 'shipper') {
-    showToast('Only shipper can access workspace', 'error');
-    return;
-  }
-  window.location.href = `${getAppBaseUrl()}/shipper/workspace`;
+function openCashierDashboard() {
+  window.location.href = `${getAppBaseUrl()}/cashier/dashboard`;
 }
+
 
 function openCustomerPortal() {
   if (!state.currentUser) {

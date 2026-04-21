@@ -13,15 +13,6 @@
     href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,400;0,600;0,700;0,900;1,400&family=Barlow+Condensed:wght@400;700;900&display=swap"
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/static/css/main.css">
-  <script>
-    window.MAPBOX_ACCESS_TOKEN = "{{ mapbox_access_token }}";
-  </script>
-  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
-  <link rel="stylesheet"
-    href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
-  <script
-    src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
 </head>
 
 <body>
@@ -40,6 +31,7 @@
   <button id="back-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
 
   <!-- NAVBAR -->
+  <!-- NAVBAR -->
   <nav id="navbar">
     <div class="container">
       <div class="nav-inner">
@@ -50,8 +42,8 @@
         <div class="nav-menu">
           <a class="nav-link active" href="#hero" data-nav>Home</a>
           <a class="nav-link" href="#menu" data-nav>Menu</a>
-          <a class="nav-link" href="#about" data-nav>About</a>
-          <a class="nav-link" href="#promotions" data-nav>Promotions</a>
+          <a class="nav-link" href="#promotions" data-nav>Ưu Đãi</a>
+          <a class="nav-link" href="#about" data-nav>Về Chúng Tôi</a>
         </div>
         <div class="nav-actions">
           <button class="nav-icon-btn is-hidden" id="cart-toggle" title="Cart" aria-label="Cart" type="button">
@@ -64,9 +56,9 @@
             <div id="user-dropdown" class="user-dropdown-menu is-hidden">
               <div class="user-greeting-title" id="user-greeting">Hello, User</div>
               <button class="mobile-nav-link user-dropdown-link is-hidden" id="customer-access-btn"
-                onclick="openCustomerPortal()">👤 Customer Portal</button>
-              <button class="mobile-nav-link user-dropdown-link is-hidden" id="shipper-access-btn"
-                onclick="openShipperWorkspace()">🛵 Shipper Workspace</button>
+                onclick="openCustomerPortal()">👤 Portal Khách</button>
+              <button class="mobile-nav-link user-dropdown-link is-hidden" id="cashier-access-btn"
+                onclick="openCashierDashboard()">💸 Thu ngân Dashboard</button>
               <button class="mobile-nav-link user-dropdown-link is-hidden" id="admin-access-btn"
                 onclick="openAdminDashboard()">⚙️ Admin Dashboard</button>
               <button class="mobile-nav-link user-dropdown-link user-dropdown-logout" onclick="logout()">🚪
@@ -83,9 +75,9 @@
   <!-- MOBILE MENU -->
   <div class="mobile-menu" id="mobile-menu">
     <a class="mobile-nav-link" href="#hero" onclick="closeMobileMenu()">🏠 Home</a>
+    <a class="mobile-nav-link" href="#about" onclick="closeMobileMenu()">📖 Về Tày</a>
     <a class="mobile-nav-link" href="#menu" onclick="closeMobileMenu()">🍜 Menu</a>
-    <a class="mobile-nav-link" href="#about" onclick="closeMobileMenu()">ℹ️ About</a>
-    <a class="mobile-nav-link" href="#promotions" onclick="closeMobileMenu()">🎉 Promotions</a>
+    <a class="mobile-nav-link" href="#promotions" onclick="closeMobileMenu()">🎉 Ưu Đãi</a>
   </div>
 
   <!-- CART OVERLAY -->
@@ -186,7 +178,7 @@
     </div>
   </div>
 
-  <!-- ==================== CATEGORIES ==================== -->
+  <!-- ==================== CATEGORIES (MOVED BACK UP) ==================== -->
   <section id="categories" class="section">
     <div class="container">
       <div class="section-header text-center">
@@ -196,6 +188,33 @@
       <div class="categories-grid" id="categories-grid">
         <!-- Populated by JS -->
       </div>
+    </div>
+  </section>
+
+  <!-- ==================== MENU / PRODUCTS (MOVED BACK UP) ==================== -->
+  <section id="menu" class="section section-pt-0">
+    <div class="container">
+      <div class="section-header-flex section-header fade-in">
+        <div>
+          <div class="section-label">Menu Của Chúng Tôi</div>
+          <h2 class="section-title">SẢN PHẨM NỔI BẬT</h2>
+        </div>
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="Tìm thức uống, món ăn..." oninput="filterProducts()"
+            autocomplete="off" autocorrect="off" spellcheck="false">
+        </div>
+      </div>
+      <div class="products-filter fade-in" id="product-filters">
+        <button class="filter-btn active" onclick="setFilter('all', this)">Tất cả</button>
+        <button class="filter-btn" onclick="setFilter('coffee', this)">☕ Cà phê</button>
+        <button class="filter-btn" onclick="setFilter('tea', this)">🍵 Trà sữa</button>
+        <button class="filter-btn" onclick="setFilter('cake', this)">🧁 Bánh ngọt</button>
+        <button class="filter-btn" onclick="filterByPrice(0,30000, this)">Dưới 30k</button>
+        <button class="filter-btn" onclick="filterByPrice(30000,999999, this)">Trên 30k</button>
+      </div>
+      <div class="products-grid" id="products-grid"></div>
+      <div class="pagination" id="pagination"></div>
     </div>
   </section>
 
@@ -284,38 +303,6 @@
     </div>
   </section>
 
-  <!-- ==================== PROMOTIONS ==================== -->
-  <section id="promotions" class="section">
-    <div class="container">
-      <div class="section-header fade-in">
-        <div class="section-label">Ưu Đãi Cực Hot</div>
-        <h2 class="section-title">KHUYẾN MÃI</h2>
-        <div class="divider"></div>
-        <p class="promo-lead">Sử dụng các mã giảm giá dưới đây khi thanh toán để nhận ưu đãi hấp dẫn.</p>
-      </div>
-      <div class="promo-code-section fade-in">
-        <div class="promo-code-label">CÁC MÃ GIẢM GIÁ HIỆN CÓ</div>
-        <div class="promo-code-help">Click vào mã để copy</div>
-        <div class="promo-codes-grid">
-          <div class="promo-code-card" onclick="copyCode('TAYCOFFEE20')">
-            <div class="promo-code">TAYCOFFEE20</div>
-            <div class="promo-value">Giảm 20% tổng đơn</div>
-            <div class="promo-desc-text">Đơn từ 100k - Tất cả SP</div>
-          </div>
-          <div class="promo-code-card" onclick="copyCode('COFFEE10')">
-            <div class="promo-code">COFFEE10</div>
-            <div class="promo-value">Giảm 10k đơn từ 50k</div>
-            <div class="promo-desc-text">Chỉ áp dụng Cà phê</div>
-          </div>
-          <div class="promo-code-card" onclick="copyCode('NEWBIE')">
-            <div class="promo-code">NEWBIE</div>
-            <div class="promo-value">FREESHIP</div>
-            <div class="promo-desc-text">Cho khách hàng mới</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <!-- ==================== REVIEWS ==================== -->
   <section class="section reviews-section-bg">
@@ -365,7 +352,35 @@
     </div>
   </section>
 
-  <!-- ==================== ABOUT ==================== -->
+  <!-- ==================== PROMOTIONS (RESTORED) ==================== -->
+  <section id="promotions" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-label">Ưu Đãi Cực Hot</div>
+        <h2 class="section-title">KHUYẾN MÃI</h2>
+        <div class="divider"></div>
+        <p class="promo-lead">Sử dụng các mã giảm giá dưới đây khi thanh toán để nhận ưu đãi hấp dẫn.</p>
+      </div>
+      <div class="promo-code-section fade-in">
+        <div class="promo-code-label">CÁC MÃ GIẢM GIÁ HIỆN CÓ</div>
+        <div class="promo-code-help">Click vào mã để copy</div>
+        <div class="promo-codes-grid">
+          <div class="promo-code-card" onclick="copyCode('TAYCOFFEE20')">
+            <div class="promo-code">TAYCOFFEE20</div>
+            <div class="promo-value">Giảm 20% tổng đơn</div>
+            <div class="promo-desc-text">Đơn từ 100k - Tất cả SP</div>
+          </div>
+          <div class="promo-code-card" onclick="copyCode('COFFEE10')">
+            <div class="promo-code">COFFEE10</div>
+            <div class="promo-value">Giảm 10k đơn từ 50k</div>
+            <div class="promo-desc-text">Chỉ áp dụng Cà phê</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ABOUT (RESTORED TO BOTTOM) ==================== -->
   <section id="about" class="section">
     <div class="container">
       <div class="about-grid">
@@ -384,7 +399,7 @@
           <p class="about-text about-text-gap-16">
             Tày Coffee ra đời từ niềm đam mê với những hương vị nguyên bản, đậm chất núi rừng Tây Bắc. Thành lập từ năm 2019, chúng tôi chuyên cung cấp những loại cà phê đặc sản - từ cà phê muối đặc trưng đến trà sữa khoai môn thơm nồng.
           </p>
-          <p class="about-text about-text-gap-32">
+          <p class="about-text about-text-gap-32" style="color:var(--gray-soft)">
             Mỗi công thức đều được đội ngũ chuyên gia pha chế tâm huyết phát triển, với niềm tin rằng một tách cà phê ngon sẽ mang lại năng lượng tuyệt vời cho ngày mới của bạn.
           </p>
           <div class="about-features">
@@ -400,20 +415,6 @@
               <div>
                 <div class="about-feature-title">Giao Hàng Siêu Tốc</div>
                 <div class="about-feature-text">Luôn nồng nàn khi đến tay bạn trong 30 phút</div>
-              </div>
-            </div>
-            <div class="about-feature">
-              <div class="about-feature-icon">🌱</div>
-              <div>
-                <div class="about-feature-title">Nguyên Liệu Tươi</div>
-                <div class="about-feature-text">Nhập mới mỗi ngày, không chất bảo quản</div>
-              </div>
-            </div>
-            <div class="about-feature">
-              <div class="about-feature-icon">♻️</div>
-              <div>
-                <div class="about-feature-title">Bao Bì Thân Thiện</div>
-                <div class="about-feature-text">100% vật liệu giấy tái chế và bền vững</div>
               </div>
             </div>
           </div>
@@ -436,9 +437,6 @@
             <a href="#" class="social-icon" title="Twitter">🐦</a>
             <a href="#" class="social-icon" title="YouTube">▶️</a>
           </div>
-          <div class="footer-map">
-            <div id="footer-map-canvas" class="footer-map-canvas"></div>
-          </div>
         </div>
         <div>
           <div class="footer-col-title">Liên Kết Nhanh</div>
@@ -448,7 +446,6 @@
             <a href="#promotions" class="footer-link">→ Khuyến mãi</a>
             <a href="#about" class="footer-link">→ Về chúng tôi</a>
             <a href="/customer" class="footer-link">→ Thành viên</a>
-            <a href="/shipper/workspace" class="footer-link">→ Nhân viên giao hàng</a>
             <a href="/admin/dashboard" class="footer-link">→ Quản trị Dashboard</a>
             <a href="#" onclick="openModal('login-modal')" class="footer-link">→ Đăng nhập / Đăng ký</a>
           </div>

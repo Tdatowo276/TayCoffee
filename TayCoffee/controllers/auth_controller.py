@@ -39,13 +39,19 @@ def handle_social_login(user_info, provider_name):
     <head>
         <script>
             localStorage.setItem('tay_coffee_current_user_email', '{user['email']}');
-            localStorage.setItem('tay_coffee_current_user', JSON.stringify({{
+            const userObj = {{
                 "id": "{user['userid']}",
                 "name": "{user['fullname']}",
                 "email": "{user['email']}",
-                "role": "staff",
                 "role_id": {user['roleid']}
-            }}));
+            }};
+            // Map role string for frontend compatibility
+            if (userObj.role_id === 1) userObj.role = 'admin';
+            else if (userObj.role_id === 2) userObj.role = 'cashier';
+            else if (userObj.role_id === 3) userObj.role = 'staff';
+            else userObj.role = 'customer';
+            
+            localStorage.setItem('tay_coffee_current_user', JSON.stringify(userObj));
             window.location.href = '/';
         </script>
     </head>

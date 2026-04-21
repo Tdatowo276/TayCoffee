@@ -2,7 +2,7 @@ const ADMIN_DATA = {
   products: [],
   orders: [],
   users: [],
-  shippers: [],
+  cashiers: [],
   promos: [], // Will load from API
   revenue: [
     { day: "Mon", amount: 840 },
@@ -19,11 +19,11 @@ const SESSION_USER_KEY = "tay_coffee_current_user";
 const SESSION_STORAGE_KEY = "tay_coffee_current_user_email";
 
 const STATUS_MAP = {
-  pending: { label: "Chờ xử lý", cls: "sbadge-warning" },
-  preparing: { label: "Đang pha chế", cls: "sbadge-warning" },
-  served: { label: "Đã phục vụ", cls: "sbadge-info" },
-  completed: { label: "Hoàn tất", cls: "sbadge-success" },
-  cancelled: { label: "Đã hủy", cls: "sbadge-danger" },
+  pending: { label: "Đang chờ", cls: "sbadge-warning" },
+  preparing: { label: "Chuẩn bị", cls: "sbadge-warning" },
+  served: { label: "Đã giao", cls: "sbadge-info" },
+  completed: { label: "Xong", cls: "sbadge-success" },
+  cancelled: { label: "Hủy", cls: "sbadge-danger" },
 };
 
 let unsubscribeOrdersRealtime = null;
@@ -94,40 +94,43 @@ async function fetchAdminUsers(role, limit = 200) {
 }
 
 function adminToast(msg, type = "info") {
-  // Always use inline toast - never use alert() which blocks JS execution
   const icons = {
-    default: "🔥",
-    success: "✅",
-    error: "❌",
-    info: "ℹ️",
-    warning: "⚠️",
+    default: '<i class="fa-solid fa-fire"></i>',
+    success: '<i class="fa-solid fa-circle-check"></i>',
+    error: '<i class="fa-solid fa-circle-exclamation"></i>',
+    info: '<i class="fa-solid fa-circle-info"></i>',
+    warning: '<i class="fa-solid fa-triangle-exclamation"></i>',
   };
+  
   let container = document.getElementById("toast-container");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "toast-container";
-    container.style.cssText =
-      "position:fixed;bottom:28px;right:28px;z-index:9999;display:flex;flex-direction:column;gap:10px;";
-    document.body.appendChild(container);
-  }
+  if (!container) return; // Should exist in dashboard.html
+
   const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
   toast.style.cssText = `
-    display:flex;align-items:center;gap:10px;
-    background:${type === 'error' ? 'rgba(232,0,13,0.92)' : type === 'success' ? 'rgba(34,197,94,0.92)' : 'rgba(30,30,30,0.95)'};
-    color:#fff;padding:13px 20px;border-radius:10px;
-    font-family:var(--font-cond,sans-serif);font-size:14px;font-weight:700;letter-spacing:.5px;
-    box-shadow:0 4px 24px rgba(0,0,0,0.5);min-width:220px;max-width:360px;
-    border:1px solid rgba(255,255,255,0.1);
-    animation:fadeInUp .25s ease;
+    display:flex; align-items:center; gap:12px;
+    background: var(--bg-surface);
+    color: var(--white);
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    border: 1px solid var(--glass-border);
+    animation: fadeInUp .3s ease forwards;
+    margin-bottom: 12px;
   `;
-  toast.innerHTML = `<span style="font-size:18px">${icons[type] || "🔥"}</span><span>${msg}</span>`;
+  
+  const iconSpan = `<span style="color:var(--gold); font-size:18px">${icons[type] || icons.default}</span>`;
+  toast.innerHTML = `${iconSpan} <span>${msg}</span>`;
   container.appendChild(toast);
+  
   setTimeout(() => {
     toast.style.opacity = "0";
     toast.style.transform = "translateY(10px)";
-    toast.style.transition = "all .3s";
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
+    toast.style.transition = "all 0.4s";
+    setTimeout(() => toast.remove(), 400);
+  }, 4000);
 }
 
 function formatOrderDisplayId(dbId) {
@@ -173,7 +176,7 @@ function debouncedFilterTable(tbodyId, query, delay = 180) {
 
 async function loadAdminDataFromAPI() {
   try {
-    console.log("[Admin] Starting data load from backend API...");
+    console.log("[Manager] Starting data load from backend API...");
 
     let products = [];
     let customerUsers = [];
@@ -190,7 +193,7 @@ async function loadAdminDataFromAPI() {
         APIClient.getAdminUsers &&
         APIClient.getOrders
       ) {
-        console.log("[Admin] Using APIClient to load all data...");
+        console.log("[Manager] Using APIClient to load all data...");
         [products, orders, customerUsers, shipperUsers] = await Promise.all([
           APIClient.getProducts(300),
           APIClient.getOrders(300),
@@ -199,7 +202,7 @@ async function loadAdminDataFromAPI() {
         ]);
       } else {
         console.log(
-          "[Admin] APIClient not available, using fetchItems fallback...",
+          "[Manager] APIClient not available, using fetchItems fallback...",
         );
         [products, orders, customerUsers, shipperUsers] = await Promise.all([
           fetchItems("/products", 300),
@@ -209,17 +212,17 @@ async function loadAdminDataFromAPI() {
         ]);
       }
       console.log(
-        "[Admin] Raw API response - products:",
+        "[Manager] Raw API response - products:",
         products.length,
         "customers:",
         customerUsers.length,
-        "shippers:",
+        "cashiers:",
         shipperUsers.length,
         "orders:",
         orders.length,
       );
     } catch (err) {
-      console.error("[Admin] Failed to load data from backend:", err);
+      console.error("[Manager] Failed to load data from backend:", err);
       products = products || [];
       customerUsers = customerUsers || [];
       shipperUsers = shipperUsers || [];
@@ -296,7 +299,7 @@ async function loadAdminDataFromAPI() {
       };
     });
 
-    ADMIN_DATA.shippers = (shipperUsers || []).map((u) => {
+    ADMIN_DATA.cashiers = (shipperUsers || []).map((u) => {
       const id = Number(u.id || u.userid);
       const active = u.is_active !== false;
       return {
@@ -310,36 +313,39 @@ async function loadAdminDataFromAPI() {
       };
     });
 
-    console.log("[Admin] ✅ Data loaded successfully:", {
+    console.log("[Manager] ✅ Data loaded successfully:", {
       products: ADMIN_DATA.products.length,
       users: ADMIN_DATA.users.length,
       orders: ADMIN_DATA.orders.length,
-      shippers: ADMIN_DATA.shippers.length,
+      cashiers: ADMIN_DATA.cashiers.length,
     });
   } catch (err) {
-    console.error("[Admin] CRITICAL - Data load failed:", err);
+    console.error("[Manager] CRITICAL - Data load failed:", err);
     adminToast(`Cannot load dashboard data: ${err.message || err}`, "error");
   }
 }
 
 function renderStats() {
   try {
-    const deliveredRevenue = ADMIN_DATA.orders
+    const deliveredRevenue = (ADMIN_DATA.orders || [])
       .filter((o) => o.status === "completed")
       .reduce((sum, o) => sum + parseAmount(o.total), 0);
 
     const statRevenue = document.getElementById("stat-revenue");
     const statOrders = document.getElementById("stat-orders");
     const statUsers = document.getElementById("stat-users");
-    const statShippers = document.getElementById("stat-shippers");
+    const statTables = document.getElementById("stat-tables");
 
     if (statRevenue)
       statRevenue.textContent = deliveredRevenue.toLocaleString('vi-VN') + "₫";
-    if (statOrders) statOrders.textContent = ADMIN_DATA.orders.length;
-    if (statUsers) statUsers.textContent = ADMIN_DATA.users.length;
-    if (statShippers) statShippers.textContent = ADMIN_DATA.shippers.length;
+    if (statOrders) statOrders.textContent = (ADMIN_DATA.orders || []).length;
+    if (statUsers) statUsers.textContent = (ADMIN_DATA.users || []).length;
+    if (statTables) {
+       const activeTableCount = new Set((ADMIN_DATA.orders || []).filter(o => !['completed', 'cancelled'].includes(o.status)).map(o => o.tableNumber)).size;
+       statTables.textContent = activeTableCount;
+    }
   } catch (err) {
-    console.error("[Admin] renderStats error:", err);
+    console.error("[Manager] renderStats error:", err);
   }
 }
 
@@ -356,149 +362,98 @@ function renderRevenueChart() {
         return `<div class="chart-bar-item">
         <div class="chart-bar-label">${d.day}</div>
         <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${pct}%"></div></div>
-        <div class="chart-bar-val">$${d.amount.toLocaleString()}</div>
+        <div class="chart-bar-val">${d.amount.toLocaleString('vi-VN')}₫</div>
       </div>`;
       })
       .join("");
-    console.log("[Admin] renderRevenueChart success");
   } catch (err) {
-    console.error("[Admin] renderRevenueChart error:", err);
+    console.error("[Manager] renderRevenueChart error:", err);
   }
 }
 
 
 
 function renderRecentOrders() {
-  try {
-    const tbody = document.getElementById("recent-orders-body");
-    if (!tbody) {
-      console.warn("[Admin] recent-orders-body element not found");
-      return;
-    }
-    if (!ADMIN_DATA.orders || ADMIN_DATA.orders.length === 0) {
-      tbody.innerHTML =
-        '<tr><td colspan="6" class="table-empty">No recent orders</td></tr>';
-      return;
-    }
-    const html = ADMIN_DATA.orders
-      .slice(0, 8)
+  const tbody = document.getElementById("recent-orders-body");
+  if (!tbody) return;
+  const recent = (ADMIN_DATA.orders || []).slice(0, 5);
+  if (recent.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">No recent activity</td></tr>';
+    return;
+  }
+  tbody.innerHTML = recent
       .map((o) => {
-        const s = STATUS_MAP[o.status] || {
-          label: o.status,
-          cls: "sbadge-info",
-        };
+        const s = STATUS_MAP[o.status] || { label: o.status, cls: "sbadge-info" };
         return `<tr>
-        <td>${o.id}</td>
-        <td>${o.customer}</td>
-        <td class="muted">${o.items}</td>
-        <td>${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
-        <td><span class="muted">${o.tableNumber}</span></td>
+        <td style="font-weight:700; color:var(--white)">${o.id}</td>
+        <td style="font-weight:600">${o.customer}</td>
+        <td style="max-width:180px; font-size:12px; opacity:0.75">${o.items}</td>
+        <td style="color:var(--gold); font-weight:700">${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
         <td><span class="sbadge ${s.cls}">${s.label}</span></td>
-        <td class="muted">${o.date}</td>
+        <td style="font-size:12px; opacity:0.5">${o.date}</td>
       </tr>`;
       })
       .join("");
-    tbody.innerHTML = html;
-    console.log(
-      "[Admin] renderRecentOrders success, inserted",
-      Math.min(ADMIN_DATA.orders.length, 8),
-      "rows",
-    );
-  } catch (err) {
-    console.error("[Admin] renderRecentOrders error:", err);
-  }
 }
 
 function renderProducts() {
   try {
     const tbody = document.getElementById("products-body");
-    if (!tbody) {
-      console.warn("[Admin] products-body element not found");
-      return;
-    }
+    if (!tbody) return;
     if (!ADMIN_DATA.products || ADMIN_DATA.products.length === 0) {
-      tbody.innerHTML =
-        '<tr><td colspan="6" class="table-empty">No products</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="table-empty">No products in inventory</td></tr>';
       return;
     }
-    const html = ADMIN_DATA.products
-      .map(
-        (p) => `<tr>
-      <td>${p.name}</td>
-      <td>${p.cat}</td>
-      <td>${p.price.toLocaleString('vi-VN')}₫</td>
-      <td><span class="sbadge ${p.available ? "sbadge-success" : "sbadge-danger"}">${p.available ? "In stock" : "Out of stock"}</span></td>
-      <td></td>
-      <td><div class="abtns">
-        <button class="abtn abtn-edit" onclick="editProduct(${p.id})">Edit</button>
-        <button class="abtn abtn-del" onclick="deleteProduct(${p.id})">Delete</button>
-      </div></td>
-    </tr>`,
-      )
-      .join("");
-    tbody.innerHTML = html;
-    console.log(
-      "[Admin] renderProducts success, inserted",
-      ADMIN_DATA.products.length,
-      "rows",
-    );
+    tbody.innerHTML = ADMIN_DATA.products
+      .map((p) => `<tr>
+      <td style="font-weight:700; color:var(--white)">${p.emoji} ${p.name}</td>
+      <td><span style="padding:4px 10px; background:rgba(255,255,255,0.05); border-radius:6px; font-size:12px">${p.cat}</span></td>
+      <td style="color:var(--gold); font-weight:700">${p.price.toLocaleString('vi-VN')}₫</td>
+      <td><span class="sbadge ${p.available ? "sbadge-success" : "sbadge-danger"}">${p.available ? "Hệ thống hiển thị" : "Tạm ẩn"}</span></td>
+      <td>
+        <div class="abtns">
+          <button class="abtn abtn-view" onclick="editProduct(${p.id})"><i class="fa-solid fa-pen-to-square"></i></button>
+          <button class="abtn" onclick="deleteProduct(${p.id})" style="border-color:rgba(231,76,60,0.2); color:#e74c3c"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>`).join("");
   } catch (err) {
-    console.error("[Admin] renderProducts error:", err);
+    console.error("[Manager] renderProducts error:", err);
   }
 }
 
 function renderOrders() {
-  try {
-    const tbody = document.getElementById("orders-body");
-    if (!tbody) {
-      console.warn("[Admin] orders-body element not found");
-      return;
-    }
-    if (!ADMIN_DATA.orders || ADMIN_DATA.orders.length === 0) {
-      tbody.innerHTML =
-        '<tr><td colspan="8" class="table-empty">No orders</td></tr>';
-      return;
-    }
+  const tbody = document.getElementById("orders-body");
+  if (!tbody) return;
+  const orders = ADMIN_DATA.orders || [];
+  if (orders.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="table-empty">No order history found</td></tr>';
+    return;
+  }
 
-    const html = ADMIN_DATA.orders
+  tbody.innerHTML = orders
       .map((o) => {
-        const s = STATUS_MAP[o.status] || {
-          label: o.status,
-          cls: "sbadge-info",
-        };
+        const s = STATUS_MAP[o.status] || { label: o.status, cls: "sbadge-info" };
         const statusOptions = Object.keys(STATUS_MAP)
-          .map(
-            (k) =>
-              `<option value="${k}" ${k === o.status ? "selected" : ""}>${STATUS_MAP[k].label}</option>`,
-          )
+          .map(k => `<option value="${k}" ${k === o.status ? "selected" : ""}>${STATUS_MAP[k].label}</option>`)
           .join("");
-        const notesHtml = o.notes ? `<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:4px;font-style:italic;">📝 ${o.notes}</div>` : '';
+        const notesHtml = o.notes ? `<div style="font-size:11px; color:var(--gold); margin-top:4px; font-style:italic; opacity:0.8"><i class="fa-solid fa-comment-dots"></i> ${o.notes}</div>` : '';
         return `<tr>
-        <td>${o.id}</td>
-        <td>${o.customer}</td>
-        <td class="muted">${o.items}${notesHtml}</td>
-        <td>${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
-        <td>${o.tableNumber}</td>
+        <td style="font-weight:700; color:var(--white)">${o.id}</td>
+        <td style="font-weight:600">${o.customer}</td>
+        <td style="max-width:200px"><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${o.items}</div>${notesHtml}</td>
+        <td style="color:var(--gold); font-weight:700">${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
+        <td><span style="padding:4px 8px; background:rgba(255,255,255,0.05); border-radius:4px">${o.tableNumber}</span></td>
         <td>
           <span class="sbadge ${s.cls}">${s.label}</span>
-          <select class="status-select" onchange="updateOrderStatus('${o.id}', this.value)">
+          <select class="status-select" onchange="updateOrderStatus('${o.id}', this.value)" style="width:auto; margin-left:8px">
             ${statusOptions}
           </select>
         </td>
-        <td class="muted">${o.date}</td>
-        <td><button class="abtn abtn-view" onclick="openOrderDetails('${o.id}')">Xem</button></td>
+        <td style="font-size:12px; opacity:0.6">${o.date}</td>
+        <td><button class="abtn abtn-view" onclick="openOrderDetails('${o.id}')"><i class="fa-solid fa-eye"></i></button></td>
       </tr>`;
-      })
-      .join("");
-    tbody.innerHTML = html;
-    console.log(
-      "[Admin] renderOrders success, inserted",
-      ADMIN_DATA.orders.length,
-      "rows",
-    );
-  } catch (err) {
-    console.error("[Admin] renderOrders error:", err);
-  }
+      }).join("");
 }
 
 async function updateOrderStatus(orderId, status) {
@@ -514,100 +469,53 @@ async function updateOrderStatus(orderId, status) {
     adminToast(`Updated ${orderId}`, "success");
   } catch (err) {
     adminToast(`Update failed: ${err.message || err}`, "error");
-    renderOrders();
+    if (typeof renderOrders === "function") renderOrders();
   }
 }
 
 function renderUsers() {
   try {
     const tbody = document.getElementById("users-body");
-    if (!tbody) {
-      console.warn("[Admin] users-body element not found");
+    if (!tbody) return;
+
+    const staffs = (ADMIN_DATA.users || []).map(u => ({ ...u, displayRole: 'Staff', icon: 'fa-user-tie' }));
+    const cashiers = (ADMIN_DATA.cashiers || []).map(c => ({ ...c, displayRole: 'Cashier', icon: 'fa-cash-register' }));
+    const allPersonnel = [...staffs, ...cashiers];
+
+    if (allPersonnel.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="table-empty">No personnel found</td></tr>';
       return;
     }
-    if (!ADMIN_DATA.users || ADMIN_DATA.users.length === 0) {
-      tbody.innerHTML =
-        '<tr><td colspan="7" class="table-empty">No users</td></tr>';
-      return;
-    }
-    const html = ADMIN_DATA.users
+
+    tbody.innerHTML = allPersonnel
       .map((u) => {
         const statusClass = u.active ? "sbadge-success" : "sbadge-danger";
-        const statusLabel = u.active ? "Active" : "Inactive";
-        const actionLabel = u.active ? "Deactivate" : "Activate";
+        const statusLabel = u.active ? "Online" : "Offline";
         return `<tr>
-        <td>${u.name}</td>
-        <td>${u.email}</td>
-        <td>${u.phone}</td>
-        <td>${u.orders || 0}</td>
-        <td>${u.joined}</td>
+        <td style="font-weight:700; color:var(--white)"><i class="fa-solid ${u.icon}" style="margin-right:8px; opacity:0.6"></i>${u.name}</td>
+        <td style="font-size:12px">${u.email}<br/><span style="opacity:0.5">${u.phone}</span></td>
+        <td><span style="font-weight:700; color:var(--gold)">${u.displayRole}</span></td>
+        <td>${u.orders || u.completed || 0} tasks</td>
+        <td style="font-size:12px; opacity:0.6">${u.joined || '-'}</td>
         <td><span class="sbadge ${statusClass}">${statusLabel}</span></td>
         <td>
           <div class="abtns">
-            <button class="abtn abtn-edit" onclick="openUserModal('customer', ${u.id})">Edit</button>
-            <button class="abtn abtn-del" onclick="deleteAdminUser(${u.id})">Delete</button>
+            <button class="abtn abtn-view" onclick="openUserModal('${u.displayRole.toLowerCase()}', ${u.id})"><i class="fa-solid fa-user-pen"></i></button>
+            <button class="abtn" onclick="deleteAdminUser(${u.id})" style="border-color:rgba(231,76,60,0.2); color:#e74c3c"><i class="fa-solid fa-user-xmark"></i></button>
           </div>
         </td>
       </tr>`;
-      })
-      .join("");
-    tbody.innerHTML = html;
-    console.log(
-      "[Admin] renderUsers success, inserted",
-      ADMIN_DATA.users.length,
-      "rows",
-    );
+      }).join("");
   } catch (err) {
-    console.error("[Admin] renderUsers error:", err);
+    console.error("[Manager] renderUsers error:", err);
   }
 }
 
-function renderShippers() {
-  try {
-    const tbody = document.getElementById("shippers-body");
-    if (!tbody) {
-      console.warn("[Admin] shippers-body element not found");
-      return;
-    }
-    if (!ADMIN_DATA.shippers || ADMIN_DATA.shippers.length === 0) {
-      tbody.innerHTML =
-        '<tr><td colspan="5" class="table-empty">No shippers</td></tr>';
-      return;
-    }
-    const html = ADMIN_DATA.shippers
-      .map((s) => {
-        const statusClass = s.active ? "sbadge-success" : "sbadge-danger";
-        const statusLabel = s.active ? "Online" : "Offline";
-        const actionLabel = s.active ? "Deactivate" : "Activate";
-        return `<tr>
-        <td>${s.name}</td>
-        <td>${s.phone}</td>
-        <td>${s.completed ?? 0}</td>
-        <td><span class="sbadge ${statusClass}">${statusLabel}</span></td>
-        <td>
-          <div class="abtns">
-            <button class="abtn abtn-edit" onclick="openUserModal('shipper', ${s.id})">Sửa</button>
-            <button class="abtn abtn-del" onclick="deleteAdminUser(${s.id})">Xóa</button>
-          </div>
-        </td>
-      </tr>`;
-      })
-      .join("");
-    tbody.innerHTML = html;
-    console.log(
-      "[Admin] renderShippers success, inserted",
-      ADMIN_DATA.shippers.length,
-      "rows",
-    );
-  } catch (err) {
-    console.error("[Admin] renderShippers error:", err);
-  }
-}
 
 function renderPromos() {
   const tbody = document.getElementById("promos-body");
   if (!tbody) {
-    console.warn("[Admin] promos-body element not found");
+    console.warn("[Manager] promos-body element not found");
     return;
   }
   if (
@@ -751,7 +659,7 @@ async function saveProduct() {
       } else {
         // USE LOCAL (Flask)
         try {
-          console.log("[Admin] Falling back to local image upload...");
+          console.log("[Manager] Falling back to local image upload...");
           const res = await APIClient.uploadProductImageLocal(createdProductId, file);
           if (res.ok) {
             adminToast("Image uploaded locally", "success");
@@ -791,7 +699,7 @@ async function saveProduct() {
 }
 
 function getUserCollection(role) {
-  return role === "cashier" ? ADMIN_DATA.shippers : ADMIN_DATA.users;
+  return role === "cashier" ? ADMIN_DATA.cashiers : ADMIN_DATA.users;
 }
 
 function openUserModal(role = "customer", userId = null) {
@@ -884,7 +792,6 @@ async function saveUserInfo() {
     await loadAdminDataFromAPI();
     renderStats();
     renderUsers();
-    renderShippers();
   } catch (err) {
     adminToast(err.message || "Operation failed", "error");
   }
@@ -897,8 +804,11 @@ async function deleteAdminUser(userId) {
     adminToast(res.message || "User deleted", "success");
     await loadAdminDataFromAPI();
     renderStats();
+    renderRecentOrders();
+    renderProducts();
+    renderOrders();
     renderUsers();
-    renderShippers();
+    renderPromos();
   } catch (err) {
     adminToast(err.message || "Delete failed", "error");
   }
@@ -977,10 +887,9 @@ function initPollingRefresh() {
       renderProducts();
       renderOrders();
       renderUsers();
-      renderShippers();
       renderPromos();
     } catch (err) {
-      console.warn('[Admin] Polling refresh failed:', err);
+      console.warn('[Manager] Polling refresh failed:', err);
     }
   }, 30000);
 }
@@ -990,7 +899,7 @@ async function logout() {
     localStorage.removeItem(SESSION_USER_KEY);
     localStorage.removeItem(SESSION_STORAGE_KEY);
   } catch (err) {
-    console.warn("[Admin] Failed to clear session storage:", err);
+    console.warn("[Manager] Failed to clear session storage:", err);
   }
 
   adminToast("Đã đăng xuất. Hẹn gặp lại!", "info");
@@ -1000,29 +909,28 @@ async function logout() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-  console.log("[Admin] DOMContentLoaded event fired");
+  console.log("[Manager] DOMContentLoaded event fired");
   try {
     initContrastModeWatcher();
-    console.log("[Admin] Calling loadAdminDataFromAPI...");
+    console.log("[Manager] Calling loadAdminDataFromAPI...");
     await loadAdminDataFromAPI();
-    console.log('[Admin] Data load complete, rendering...');
+    console.log('[Manager] Data load complete, rendering...');
     renderStats();
     renderRevenueChart();
     renderRecentOrders();
     renderProducts();
     renderOrders();
     renderUsers();
-    renderShippers();
     renderPromos();
 
     updateClock();
     setInterval(updateClock, 1000);
 
-    console.log('[Admin] Initializing polling refresh...');
+    console.log('[Manager] Initializing polling refresh...');
     initPollingRefresh();
-    console.log("[Admin] Dashboard fully loaded!");
+    console.log("[Manager] Dashboard fully loaded!");
   } catch (err) {
-    console.error("[Admin] DOMContentLoaded error:", err);
+    console.error("[Manager] DOMContentLoaded error:", err);
     adminToast(
       `Dashboard initialization failed: ${err.message || err}`,
       "error",
