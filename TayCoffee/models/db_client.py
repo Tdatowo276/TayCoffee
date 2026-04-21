@@ -13,10 +13,11 @@ DB_PASS = os.getenv('DB_PASS', 'password')
 DB_PORT = os.getenv('DB_PORT', '5432')
 
 _connection_pool = None
+_db_available = True
 
 def get_db_connection():
     """Tạo hoặc lấy một kết nối từ pool."""
-    global _connection_pool
+    global _connection_pool, _db_available
     if _connection_pool is None:
         try:
             _connection_pool = psycopg2.pool.ThreadedConnectionPool(
@@ -27,21 +28,35 @@ def get_db_connection():
                 port=DB_PORT,
                 database=DB_NAME
             )
+            _db_available = True
         except Exception as e:
-            print(f"Lỗi khi khởi tạo Connection Pool: {e}")
-            raise e
+            print(f"⚠️ Database không khả dụng: {e}")
+            _db_available = False
+            return None
     
-    return _connection_pool.getconn()
+    try:
+        return _connection_pool.getconn()
+    except Exception as e:
+        print(f"⚠️ Lỗi lấy connection từ pool: {e}")
+        _db_available = False
+        return None
 
 def release_db_connection(conn):
     """Trả kết nối về cho pool."""
     global _connection_pool
     if _connection_pool and conn:
-        _connection_pool.putconn(conn)
+        try:
+            _connection_pool.putconn(conn)
+        except:
+            pass
 
 def execute_query(query, params=None, fetch=False):
-    """Hàm tiện ích để thực thi câu lệnh SQL."""
+    """Hàm tiện ích để thực thi câu lệnh SQL. Trả về empty data nếu database không available."""
     conn = get_db_connection()
+    if conn is None:
+        print(f"⚠️ Database không khả dụng, trả về dữ liệu trống")
+        return [] if fetch else False
+    
     try:
         with conn.cursor() as cur:
             cur.execute(query, params)
@@ -52,9 +67,10 @@ def execute_query(query, params=None, fetch=False):
             conn.commit()
             return True
     except Exception as e:
-        conn.rollback()
-        print(f"Lỗi thực thi SQL: {e}")
-        raise e
+        print(f"⚠️ Lỗi thực thi SQL: {e}")
+        if fetch:
+            return []
+        return False
     finally:
         release_db_connection(conn)
 
