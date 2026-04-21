@@ -111,14 +111,12 @@
         <button class="btn btn-ghost btn-apply-sm" onclick="applyPromo()">APPLY</button>
       </div>
       <div class="cart-totals">
-        <div class="cart-total-row"><span>Subtotal</span><span id="cart-subtotal">$0.00</span></div>
-        <div class="cart-total-row" id="cart-delivery-row"><span>Delivery</span><span id="cart-delivery">$0.00</span>
-        </div>
-        <div class="cart-total-row is-hidden" id="cart-discount-row"><span>Discount</span><span id="cart-discount"
-            class="text-success">-$0.00</span></div>
-        <div class="cart-total-row total"><span>TOTAL</span><span class="price" id="cart-total">$0.00</span></div>
+        <div class="cart-total-row"><span>Tạm tính</span><span id="cart-subtotal">0 VNĐ</span></div>
+        <div class="cart-total-row is-hidden" id="cart-discount-row"><span>Giảm giá</span><span id="cart-discount"
+            class="text-success">-0 VNĐ</span></div>
+        <div class="cart-total-row total"><span>TỔNG CỘNG</span><span class="price" id="cart-total">0 VNĐ</span></div>
       </div>
-      <button class="checkout-btn" onclick="openCheckout()">CHECKOUT →</button>
+      <button class="checkout-btn" onclick="openCheckout()">THANH TOÁN →</button>
     </div>
   </div>
 
@@ -594,20 +592,19 @@
             <div class="product-tags-row" id="modal-product-tags"></div>
           </div>
           <div>
-            <div class="modal-muted-sm" id="modal-product-cat">Category</div>
+            <div class="modal-muted-sm" id="modal-product-cat">Danh mục</div>
             <div class="stars" id="modal-product-stars">★★★★★</div>
-            <div class="product-detail-price" id="modal-product-price">$0.00</div>
-            <div class="product-detail-desc" id="modal-product-desc">Description</div>
+            <div class="product-detail-price" id="modal-product-price">0 VNĐ</div>
+            <div class="product-detail-desc" id="modal-product-desc">Mô tả sản phẩm</div>
             <div class="qty-selector">
-              <label>Quantity</label>
+              <label>Số lượng</label>
               <div class="qty-control">
                 <button onclick="changeDetailQty(-1)">−</button>
                 <span id="detail-qty">1</span>
                 <button onclick="changeDetailQty(1)">+</button>
               </div>
             </div>
-            <button class="btn btn-primary btn-block-lg mb-12" id="modal-add-cart" onclick="addFromModal()">🛒 ADD TO
-              CART</button>
+            <button class="btn btn-primary btn-block-lg mb-12" id="modal-add-cart" onclick="addFromModal()">🛒 THÊM VÀO GIỎ</button>
             <div class="modal-footnote modal-footnote-compact" id="modal-availability"></div>
           </div>
         </div>
@@ -642,48 +639,39 @@
       <div class="modal-body">
         <div class="checkout-steps">
           <div class="checkout-step active" id="step1-indicator">
-            <div class="step-num">1</div><span>Shipping</span>
+            <div class="step-num">1</div><span>Chọn Bàn</span>
           </div>
           <div class="step-divider"></div>
           <div class="checkout-step" id="step2-indicator">
-            <div class="step-num">2</div><span>Payment</span>
+            <div class="step-num">2</div><span>Thanh Toán</span>
           </div>
           <div class="step-divider"></div>
           <div class="checkout-step" id="step3-indicator">
-            <div class="step-num">3</div><span>Confirm</span>
+            <div class="step-num">3</div><span>Xác Nhận</span>
           </div>
         </div>
         <div id="checkout-step1">
           <div class="form-row">
             <div class="form-group">
-              <label>First Name</label>
-              <input type="text" class="form-control" id="ship-first" placeholder="John">
+              <label>Họ và Tên</label>
+              <input type="text" class="form-control" id="ship-name" placeholder="Nguyễn Văn A">
             </div>
             <div class="form-group">
-              <label>Last Name</label>
-              <input type="text" class="form-control" id="ship-last" placeholder="Doe">
+              <label>Số điện thoại</label>
+              <input type="tel" class="form-control" id="ship-phone" placeholder="09xxx">
             </div>
-          </div>
-          <div class="form-group">
-            <label>Phone Number</label>
-            <input type="tel" class="form-control" id="ship-phone" placeholder="+84 xxx xxx xxx">
-          </div>
-          <div class="form-group mb-16">
-            <label class="form-label-premium">Delivery Address</label>
-            <div id="geocoder-container" class="mb-12"></div>
-            <div id="checkout-map"
-              style="width:100%; height:220px; border-radius:16px; border:1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-            </div>
-            <input type="hidden" id="ship-address">
-            <input type="hidden" id="ship-city">
-            <input type="hidden" id="ship-lat">
-            <input type="hidden" id="ship-lng">
           </div>
           <div class="form-group mb-20">
-            <label class="form-label-premium">Delivery Notes (optional)</label>
-            <input type="text" class="form-control" id="ship-notes" placeholder="Gate code, apartment number, etc.">
+            <label class="form-label-premium">Chọn Bàn Của Bạn</label>
+            <select class="form-control" id="table-select-checkout">
+              <option value="">-- Đang tải danh sách bàn --</option>
+            </select>
           </div>
-          <button class="btn btn-primary checkout-continue-btn" onclick="goCheckoutStep(2)">CONTINUE TO PAYMENT
+          <div class="form-group mb-20">
+            <label class="form-label-premium">Ghi chú (tùy chọn)</label>
+            <input type="text" class="form-control" id="ship-notes" placeholder="Ít đường, không đá, v.v.">
+          </div>
+          <button class="btn btn-primary checkout-continue-btn" onclick="goCheckoutStep(2)">TIẾP THEO
             →</button>
         </div>
         <div id="checkout-step2" class="is-hidden">
@@ -716,9 +704,8 @@
             </div>
           </div>
           <div class="checkout-summary-box">
-            <div class="cart-total-row"><span>Subtotal</span><span id="co-subtotal"></span></div>
-            <div class="cart-total-row"><span>Delivery</span><span id="co-delivery">$0.00</span></div>
-            <div class="cart-total-row total"><span>TOTAL</span><span class="price" id="co-total"></span></div>
+            <div class="cart-total-row"><span>Tạm tính</span><span id="co-subtotal"></span></div>
+            <div class="cart-total-row total"><span>TỔNG CỘNG</span><span class="price" id="co-total"></span></div>
           </div>
           <div class="checkout-action-row">
             <button class="btn btn-outline checkout-back-btn" onclick="goCheckoutStep(1)">← Back</button>
@@ -727,12 +714,11 @@
         </div>
         <div id="checkout-step3" class="is-hidden text-center">
           <div class="checkout-success-icon">🎉</div>
-          <div class="checkout-success-title">ORDER PLACED!</div>
-          <div class="checkout-success-text">Your order <strong id="order-id-display" class="text-red-light"></strong>
-            has been confirmed.</div>
-          <div class="checkout-success-eta">Estimated delivery: <strong class="text-white">25-35 minutes</strong></div>
-          <button class="btn btn-primary checkout-browse-btn" onclick="closeModal('checkout-modal')">CONTINUE
-            BROWSING</button>
+          <div class="checkout-success-title">ĐÃ ĐẶT MÓN!</div>
+          <div class="checkout-success-text">Đơn hàng <strong id="order-id-display" class="text-red-light"></strong>
+            của bạn đã được gửi đến quầy.</div>
+          <div class="checkout-success-eta">Vui lòng đợi trong giây lát, chúng tôi sẽ phục vụ ngay!</div>
+          <button class="btn btn-primary checkout-browse-btn" onclick="closeModal('checkout-modal')">TIẾP TỤC XEM MENU</button>
         </div>
       </div>
     </div>

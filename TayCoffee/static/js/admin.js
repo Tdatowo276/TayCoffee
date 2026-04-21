@@ -19,11 +19,11 @@ const SESSION_USER_KEY = "tay_coffee_current_user";
 const SESSION_STORAGE_KEY = "tay_coffee_current_user_email";
 
 const STATUS_MAP = {
-  pending: { label: "Pending", cls: "sbadge-warning" },
-  waiting_for_shipper: { label: "Waiting Shipper", cls: "sbadge-warning" },
-  shipping: { label: "Shipping", cls: "sbadge-info" },
-  completed: { label: "Completed", cls: "sbadge-success" },
-  cancelled: { label: "Cancelled", cls: "sbadge-danger" },
+  pending: { label: "Chờ xử lý", cls: "sbadge-warning" },
+  preparing: { label: "Đang pha chế", cls: "sbadge-warning" },
+  served: { label: "Đã phục vụ", cls: "sbadge-info" },
+  completed: { label: "Hoàn tất", cls: "sbadge-success" },
+  cancelled: { label: "Đã hủy", cls: "sbadge-danger" },
 };
 
 let unsubscribeOrdersRealtime = null;
@@ -237,6 +237,7 @@ async function loadAdminDataFromAPI() {
     ADMIN_DATA.products = (products || []).map((p) => ({
       id: Number(p.productid),
       name: p.productname || "Unnamed product",
+      categoryid: p.categoryid,
       cat: mapCategory(p.categoryid),
       price: Number(p.price || 0),
       available: p.isactive !== false,
@@ -271,15 +272,12 @@ async function loadAdminDataFromAPI() {
         get total() {
           return (this.subtotal + this.shipping) - this.discount;
         },
-        shipper: shipperId ? `Shipper #${shipperId}` : '-',
+        shipper: o.tablenumber ? `Bàn ${o.tablenumber}` : (o.table_id ? `Bàn ${o.table_id}` : '-'),
+        tableNumber: o.tablenumber || o.table_id || '-',
         status: o.orderstatus || 'pending',
         date: o.orderdate ? new Date(o.orderdate).toLocaleString('vi-VN') : '-',
         notes: o.notes || '',
-        address: o.address?.fulladdress || o.deliveryaddress || o.deliveryphone || '-',
-        lat: Number(o.latitude),
-        lng: Number(o.longitude),
-        shipper_lat: Number(o.shipper_lat),
-        shipper_lng: Number(o.shipper_lng),
+        address: '-', // Not needed for in-store
       };
     });
 
@@ -394,6 +392,7 @@ function renderRecentOrders() {
         <td>${o.customer}</td>
         <td class="muted">${o.items}</td>
         <td>${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
+        <td><span class="muted">${o.tableNumber}</span></td>
         <td><span class="sbadge ${s.cls}">${s.label}</span></td>
         <td class="muted">${o.date}</td>
       </tr>`;
@@ -478,7 +477,7 @@ function renderOrders() {
         <td>${o.customer}</td>
         <td class="muted">${o.items}</td>
         <td>${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
-        <td>${o.shipper}</td>
+        <td>${o.tableNumber}</td>
         <td>
           <span class="sbadge ${s.cls}">${s.label}</span>
           <select class="status-select" onchange="updateOrderStatus('${o.id}', this.value)">
@@ -486,7 +485,7 @@ function renderOrders() {
           </select>
         </td>
         <td class="muted">${o.date}</td>
-        <td><button class="abtn abtn-view" onclick="openOrderDetails('${o.id}')">View</button></td>
+        <td><button class="abtn abtn-view" onclick="openOrderDetails('${o.id}')">Xem</button></td>
       </tr>`;
       })
       .join("");
@@ -586,8 +585,8 @@ function renderShippers() {
         <td><span class="sbadge ${statusClass}">${statusLabel}</span></td>
         <td>
           <div class="abtns">
-            <button class="abtn abtn-edit" onclick="openUserModal('shipper', ${s.id})">Edit</button>
-            <button class="abtn abtn-del" onclick="deleteAdminUser(${s.id})">Delete</button>
+            <button class="abtn abtn-edit" onclick="openUserModal('shipper', ${s.id})">Sửa</button>
+            <button class="abtn abtn-del" onclick="deleteAdminUser(${s.id})">Xóa</button>
           </div>
         </td>
       </tr>`;
@@ -733,23 +732,34 @@ async function saveProduct() {
 
     if (file) {
       if (
-        !window.SupabaseWeb ||
-        typeof window.SupabaseWeb.uploadProductImage !== "function"
+        window.SupabaseWeb &&
+        typeof window.SupabaseWeb.uploadProductImage === "function"
       ) {
-        adminToast("Supabase Storage is not ready.", "error");
-        return;
-      }
-
-      try {
-        const upload = await window.SupabaseWeb.uploadProductImage(
-          file,
-          createdProductId,
-          "product-images",
-        );
-        await APIClient.updateProductImage(createdProductId, upload.publicUrl);
-        adminToast("Image uploaded successfully", "success");
-      } catch (err) {
-        adminToast(`Image upload failed: ${err.message || err}`, "error");
+        // USE SUPABASE (Cloud)
+        try {
+          const upload = await window.SupabaseWeb.uploadProductImage(
+            file,
+            createdProductId,
+            "product-images",
+          );
+          await APIClient.updateProductImage(createdProductId, upload.publicUrl);
+          adminToast("Image uploaded to Supabase", "success");
+        } catch (err) {
+          adminToast(`Supabase upload failed: ${err.message || err}`, "error");
+        }
+      } else {
+        // USE LOCAL (Flask)
+        try {
+          console.log("[Admin] Falling back to local image upload...");
+          const res = await APIClient.uploadProductImageLocal(createdProductId, file);
+          if (res.ok) {
+            adminToast("Image uploaded locally", "success");
+          } else {
+            throw new Error(res.error || "Local upload failed");
+          }
+        } catch (err) {
+          adminToast(`Local upload failed: ${err.message || err}`, "error");
+        }
       }
     }
 
@@ -758,12 +768,15 @@ async function saveProduct() {
       (p) => p.id === Number(createdProductId),
     );
     if (product) {
+      // Sync names between API format and UI format
+      product.name = metadata.productname;
       product.productname = metadata.productname;
       product.price = metadata.price;
       product.description = metadata.description;
       product.categoryid = metadata.categoryid;
-      product.category = metadata.categoryid;
+      product.cat = mapCategory(metadata.categoryid);
       product.emoji = metadata.emoji;
+      product.available = metadata.isactive;
       product.isactive = metadata.isactive;
       product.tags = metadata.tags;
     }
@@ -794,8 +807,8 @@ function openUserModal(role = "customer", userId = null) {
   const badge = document.getElementById("u-status-pill");
   const submitBtn = document.getElementById("user-modal-submit");
 
-  const roleLabel = role === "cashier" ? "Thu ngân" : "Nhân viên";
-  if (title) title.textContent = `${userId ? "Update" : "Create"} ${roleLabel}`;
+  const roleLabel = role === "cashier" ? "Thu ngân" : "Nhân viên phục vụ";
+  if (title) title.textContent = `${userId ? "Cập nhật" : "Tạo mới"} ${roleLabel}`;
   if (badge) {
     badge.textContent = roleLabel;
     badge.className = `sbadge ${role === "cashier" ? "sbadge-info" : "sbadge-success"}`;
@@ -814,9 +827,9 @@ function openUserModal(role = "customer", userId = null) {
     : "";
   passwordInput.value = "";
   passwordInput.placeholder = existing
-    ? "Leave blank to keep current password"
-    : "Temp password (min 8 chars)";
-  submitBtn.textContent = existing ? "Save Changes" : "Create User";
+    ? "Bỏ trống nếu không đổi mật khẩu"
+    : "Mật khẩu tạm thời (tối thiểu 8 ký tự)";
+  submitBtn.textContent = existing ? "Lưu thay đổi" : "Tạo người dùng";
 
   modal.classList.remove("hidden");
 }
@@ -920,11 +933,10 @@ function openOrderDetails(orderId) {
   const fields = {
     'order-detail-id': order.id,
     'order-detail-customer': order.customer,
-    'order-detail-shipper': order.shipper,
+    'order-detail-shipper': order.tableNumber, // Reusing ID for simplicity
     'order-detail-subtotal': `${parseAmount(order.subtotal).toLocaleString('vi-VN')}₫`,
-    'order-detail-shipping': `${parseAmount(order.shipping).toLocaleString('vi-VN')}₫`,
     'order-detail-total': `${parseAmount(order.total).toLocaleString('vi-VN')}₫`,
-    'order-detail-status': order.status,
+    'order-detail-status': STATUS_MAP[order.status]?.label || order.status,
     'order-detail-date': order.date,
     'order-detail-items': order.items || '-',
     'order-detail-notes': order.notes || '-',

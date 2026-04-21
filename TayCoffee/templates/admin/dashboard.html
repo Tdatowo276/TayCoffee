@@ -686,9 +686,9 @@
       <div class="a-sidebar-label">Management</div>
       <a class="a-nav-item" onclick="showPanel('products', this)"><span class="a-nav-icon">🍜</span>Products</a>
       <a class="a-nav-item" onclick="showPanel('orders', this)"><span class="a-nav-icon">📦</span>Orders</a>
-      <a class="a-nav-item" onclick="showPanel('users', this)"><span class="a-nav-icon">👥</span>Customers</a>
-      <a class="a-nav-item" onclick="showPanel('shippers', this)"><span class="a-nav-icon">🛵</span>Shippers</a>
-      <a class="a-nav-item" onclick="showPanel('promos', this)"><span class="a-nav-icon">🎉</span>Promotions</a>
+      <a class="a-nav-item" onclick="showPanel('users', this)"><span class="a-nav-icon">👥</span>Khách hàng</a>
+      <a class="a-nav-item" onclick="showPanel('shippers', this)"><span class="a-nav-icon">🤵</span>Nhân viên</a>
+      <a class="a-nav-item" onclick="showPanel('promos', this)"><span class="a-nav-icon">🎉</span>Khuyến mãi</a>
 
       <div class="sidebar-note">Monitor sales, inventory và fulfillment hoàn toàn trong dashboard admin.</div>
     </aside>
@@ -728,7 +728,7 @@
           <article class="stat-card">
             <div class="stat-label">Bàn đang phục vụ</div>
             <div class="stat-value" id="stat-shippers">0</div>
-            <div class="stat-change down">↓ 2 bàn trống</div>
+            <div class="stat-change down">↓ Đang hoạt động</div>
           </article>
         </section>
 
@@ -866,16 +866,16 @@
             </div>
             <table class="a-table">
               <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Customer</th>
-                  <th>Items</th>
-                  <th>Total</th>
-                  <th>Shipper</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                  <th>Actions</th>
-                </tr>
+                  <tr>
+                    <th>Đơn hàng</th>
+                    <th>Khách hàng</th>
+                    <th>Sản phẩm</th>
+                    <th>Tổng cộng</th>
+                    <th>Số bàn</th>
+                    <th>Trạng thái</th>
+                    <th>Thời gian</th>
+                    <th></th>
+                  </tr>
               </thead>
               <tbody id="orders-body"></tbody>
             </table>
@@ -928,12 +928,12 @@
             <table class="a-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Phone</th>
-                  <th>Completed</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
+                <th>Họ tên</th>
+                <th>SĐT</th>
+                <th>Đơn hàng</th>
+                <th>Trạng thái</th>
+                <th></th>
+              </tr>
               </thead>
               <tbody id="shippers-body"></tbody>
             </table>
@@ -986,11 +986,11 @@
         <div class="form-row">
           <div class="form-group">
             <label>Category</label>
-            <select class="form-control" id="prod-cat" title="Product category">
-              <option value="coffee">Cà phê</option>
-              <option value="tea">Trà sữa</option>
-              <option value="cake">Bánh ngọt</option>
-              <option value="sides">Đồ ăn kèm</option>
+            <select class="form-control" id="p-cat" title="Product category">
+              <option value="1">Cà phê</option>
+              <option value="2">Trà sữa</option>
+              <option value="3">Bánh ngọt</option>
+              <option value="4">Đồ ăn kèm</option>
             </select>
           </div>
           <div class="form-group"><label>Giá (₫)</label><input type="number" class="form-control" id="p-price"
@@ -1025,22 +1025,21 @@
     <div class="modal">
       <div class="modal-header" style="justify-content:space-between;align-items:center;gap:12px">
         <div>
-          <div style="font-family:var(--font-display);font-size:22px;letter-spacing:2px" id="user-modal-title">Create
-            Customer</div>
-          <span id="u-status-pill" class="sbadge sbadge-success">Customer</span>
+          <div style="font-family:var(--font-display);font-size:22px;letter-spacing:2px" id="user-modal-title">Quản lý nhân viên</div>
+          <span id="u-status-pill" class="sbadge sbadge-success">Nhân viên</span>
         </div>
         <button class="modal-close" onclick="closeUserModal()">✕</button>
       </div>
       <div class="modal-body">
-        <div class="form-group"><label>Full name</label><input type="text" class="form-control" id="u-name"
+        <div class="form-group"><label>Họ và tên</label><input type="text" class="form-control" id="u-name"
             placeholder="Nguyễn Văn A"></div>
         <div class="form-group"><label>Email</label><input type="email" class="form-control" id="u-email"
             placeholder="nhanvien@taycoffee.vn"></div>
         <div class="form-row">
-          <div class="form-group"><label>Phone</label><input type="tel" class="form-control" id="u-phone"
+          <div class="form-group"><label>SĐT</label><input type="tel" class="form-control" id="u-phone"
               placeholder="090..."></div>
-          <div class="form-group"><label>Password</label><input type="password" class="form-control" id="u-password"
-              placeholder="Temp password"></div>
+          <div class="form-group"><label>Mật khẩu</label><input type="password" class="form-control" id="u-password"
+              placeholder="Nhập mật khẩu"></div>
         </div>
         <p class="muted" style="font-size:12px">Mật khẩu tối thiểu 8 ký tự. Với shipper mới hệ thống sẽ yêu cầu đổi sau
           lần đăng nhập đầu.</p>
@@ -1054,48 +1053,44 @@
   <div class="modal-overlay hidden" id="order-modal">
     <div class="modal">
       <div class="modal-header">
-        <div style="font-family:var(--font-display);font-size:22px;letter-spacing:2px">Order Details</div>
+        <div style="font-family:var(--font-display);font-size:22px;letter-spacing:2px">Chi tiết Đơn hàng</div>
         <button class="modal-close" onclick="closeOrderModal()">✕</button>
       </div>
       <div class="modal-body">
         <div class="detail-grid">
           <div class="detail-card">
-            <div class="stat-label">Order</div>
-            <div class="detail-value" id="order-detail-id">#SF-0000</div>
+            <div class="stat-label">Mã đơn</div>
+            <div class="detail-value" id="order-detail-id">#TC-0000</div>
           </div>
           <div class="detail-card">
-            <div class="stat-label">Customer</div>
+            <div class="stat-label">Khách hàng</div>
             <div class="detail-value" id="order-detail-customer">-</div>
           </div>
           <div class="detail-card">
-            <div class="stat-label">Shipper</div>
+            <div class="stat-label">Số bàn</div>
             <div class="detail-value" id="order-detail-shipper">-</div>
           </div>
           <div class="detail-card">
-            <div class="muted">Subtotal</div>
-            <div class="detail-value" id="order-detail-subtotal">$0.00</div>
+            <div class="muted">Tiền món</div>
+            <div class="detail-value" id="order-detail-subtotal">0₫</div>
           </div>
           <div class="detail-card">
-            <div class="muted">Shipping</div>
-            <div class="detail-value" id="order-detail-shipping">$0.00</div>
+            <div class="muted">Tổng cộng</div>
+            <div class="detail-value" style="color:var(--red-light)" id="order-detail-total">0₫</div>
           </div>
           <div class="detail-card">
-            <div class="muted">Total</div>
-            <div class="detail-value" style="color:var(--red-light)" id="order-detail-total">$0.00</div>
+            <div class="stat-label">Trạng thái</div>
+            <div class="detail-value" id="order-detail-status">-</div>
           </div>
           <div class="detail-card">
-            <div class="stat-label">Status</div>
-            <div class="detail-value" id="order-detail-status">pending</div>
-          </div>
-          <div class="detail-card">
-            <div class="stat-label">Placed</div>
+            <div class="stat-label">Thời gian</div>
             <div class="detail-value" id="order-detail-date">-</div>
           </div>
         </div>
-        <div class="form-group"><label>Items</label>
+        <div class="form-group"><label>Sản phẩm</label>
           <p id="order-detail-items" class="muted">-</p>
         </div>
-        <div class="form-group"><label>Notes</label>
+        <div class="form-group"><label>Ghi chú</label>
           <p id="order-detail-notes" class="muted">-</p>
         </div>
 

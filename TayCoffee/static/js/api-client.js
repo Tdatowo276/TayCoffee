@@ -328,14 +328,18 @@ class APIClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image_url: imageUrl }),
     });
+    return res.json();
+  }
 
-    const text = await res.text();
-    if (!text) throw new Error("Empty response from server");
-    const data = JSON.parse(text);
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || "Failed to update product image");
-    }
-    return data;
+  static async uploadProductImageLocal(productId, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`${API_BASE}/products/${productId}/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    return res.json();
   }
 
   /**

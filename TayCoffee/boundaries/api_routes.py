@@ -2,7 +2,9 @@
 Boundaries Layer: Flask Blueprints & API Routes.
 Bridge HTTP requests to Controllers.
 """
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, current_app, session
+import os
+from werkzeug.utils import secure_filename
 from datetime import date
 
 # Import Controllers
@@ -54,11 +56,60 @@ def get_inventory():
 def get_inventory_alerts():
     return jsonify({"ok": True, "items": inventory_ctrl.get_low_stock_alerts()})
 
-@api_bp.route('/admin/products', methods=['POST'])
+@api_bp.route('/products', methods=['POST'])
 def create_product():
     from models.products import create_product
     payload = request.get_json(silent=True) or {}
     return jsonify({"ok": True, "product": create_product(**payload)})
+
+@api_bp.route('/products/<int:product_id>', methods=['POST'])
+def update_product(product_id):
+    from models.products import update_product_metadata
+    payload = request.get_json(silent=True) or {}
+    success = update_product_metadata(product_id, **payload)
+    return jsonify({"ok": success})
+
+@api_bp.route('/products/<int:product_id>/image', methods=['POST'])
+def update_product_image(product_id):
+    from models.products import update_product_image_url
+    payload = request.get_json(silent=True) or {}
+    url = payload.get('image_url')
+    if not url:
+        return jsonify({"ok": False, "error": "image_url is required"}), 400
+    success = update_product_image_url(product_id, url)
+    return jsonify({"ok": success})
+
+@api_bp.route('/products/<int:product_id>/upload', methods=['POST'])
+def upload_product_image(product_id):
+    if 'file' not in request.files:
+        return jsonify({"ok": False, "error": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"ok": False, "error": "No selected file"}), 400
+        
+    if file:
+        filename = secure_filename(f"prod_{product_id}_{file.filename}")
+        upload_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+        file.save(upload_path)
+        
+        # Update DB using the relative path that Flask can serve via static/
+        relative_url = f"/static/uploads/{filename}"
+        from models.products import update_product_image_url
+        success = update_product_image_url(product_id, relative_url)
+        
+        return jsonify({
+            "ok": success, 
+            "url": relative_url,
+            "message": "File uploaded successfully"
+        })
+    return jsonify({"ok": False, "error": "Unknown error"}), 500
+
+@api_bp.route('/products/<int:product_id>', methods=['DELETE'])
+def delete_product(product_id):
+    from models.products import delete_product
+    success, message = delete_product(product_id)
+    return jsonify({"ok": success, "message": message})
 
 # ============================================================
 # 3. ORDERS & TABLES
@@ -79,8 +130,10 @@ def list_orders():
     return jsonify({"ok": True, "items": get_all_orders(limit)})
 
 @api_bp.route('/admin/tables', methods=['GET'])
+@api_bp.route('/tables', methods=['GET'])
 def list_tables():
-    return jsonify({"ok": True, "items": table_ctrl.get_all_tables()})
+    from models.orders import get_all_tables
+    return jsonify({"ok": True, "items": get_all_tables()})
 
 @api_bp.route('/admin/tables/<table_id>', methods=['PUT'])
 def update_table(table_id):
@@ -120,6 +173,7 @@ def get_report(report_type):
 # ============================================================
 
 @api_bp.route('/admin/users', methods=['GET'])
+@api_bp.route('/users', methods=['GET'])
 def list_users():
     from models.users import get_users
     role = request.args.get('role')

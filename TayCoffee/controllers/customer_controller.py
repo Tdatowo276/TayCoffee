@@ -27,32 +27,11 @@ def _serialize_auth_user(user: dict) -> dict:
 def homepage_file():
     return render_template('index.html')
 
-@customer_bp.route('/api/health', methods=['GET'])
-def api_health():
-    """Health check for Postgres."""
-    try:
-        ping = execute_query("SELECT 1", fetch=True)
-        return jsonify({"ok": True, "database": "postgresql", "status": "connected" if ping else "error"}), 200
-    except Exception as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 500
+@customer_bp.route('/customer')
+def customer_view():
+    return render_template('customer/customer.html')
 
-@customer_bp.route('/api/users', methods=['GET'])
-def api_users():
-    limit = request.args.get('limit', default=20, type=int)
-    data = get_all_users(limit)
-    return jsonify({"count": len(data), "items": data}), 200
-
-@customer_bp.route('/api/products', methods=['GET'])
-def api_products():
-    limit = request.args.get('limit', default=20, type=int)
-    data = get_all_products()[:limit]
-    return jsonify({"count": len(data), "items": data}), 200
-
-@customer_bp.route('/api/orders', methods=['GET'])
-def api_orders():
-    limit = request.args.get('limit', default=20, type=int)
-    data = get_all_orders(limit)
-    return jsonify({"count": len(data), "items": data}), 200
+# Note: API routes shifted to boundaries/api_routes.py for BCE compliance.
 
 @customer_bp.route('/api/auth/login', methods=['POST'])
 def api_auth_login():
@@ -70,8 +49,6 @@ def api_auth_login():
     match = verify_password(password, user.get('passwordhash'))
     if not match:
         print(f"DEBUG: Password mismatch for user '{email}'.")
-        print(f"DEBUG: Input: {password} -> Hash: {hash_password(password)}")
-        print(f"DEBUG: Stored: {user.get('passwordhash')}")
         return jsonify({"ok": False, "error": "Mật khẩu không chính xác"}), 401
     
     print(f"DEBUG: Login successful for user '{email}'")

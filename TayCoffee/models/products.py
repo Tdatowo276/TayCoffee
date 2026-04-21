@@ -34,15 +34,29 @@ def update_product_image_url(product_id, image_url):
 def update_product_metadata(product_id, **kwargs):
     """Update product fields."""
     updates = {}
-    if 'name' in kwargs: updates['productname'] = kwargs['name']
-    if 'price' in kwargs: updates['price'] = float(kwargs['price'])
-    if 'description' in kwargs: updates['description'] = kwargs['description']
-    if 'image_url' in kwargs: updates['imageurl'] = kwargs['image_url']
-    if 'is_active' in kwargs: updates['isactive'] = bool(kwargs['is_active'])
     
-    if 'category_id' in kwargs:
-        cat_id = kwargs['category_id']
-        if isinstance(cat_id, str):
+    # Handle both 'name' and 'productname'
+    if 'name' in kwargs: updates['productname'] = kwargs['name']
+    if 'productname' in kwargs: updates['productname'] = kwargs['productname']
+    
+    # Handle 'price'
+    if 'price' in kwargs: updates['price'] = float(kwargs['price'])
+    
+    # Handle 'description'
+    if 'description' in kwargs: updates['description'] = kwargs['description']
+    
+    # Handle 'image_url' and 'imageurl'
+    if 'image_url' in kwargs: updates['imageurl'] = kwargs['image_url']
+    if 'imageurl' in kwargs: updates['imageurl'] = kwargs['imageurl']
+    
+    # Handle 'is_active' and 'isactive'
+    if 'is_active' in kwargs: updates['isactive'] = bool(kwargs['is_active'])
+    if 'isactive' in kwargs: updates['isactive'] = bool(kwargs['isactive'])
+    
+    # Handle 'category_id' and 'categoryid'
+    cat_id = kwargs.get('categoryid') or kwargs.get('category_id')
+    if cat_id is not None:
+        if isinstance(cat_id, str) and not cat_id.isdigit():
             cat_id = CATEGORY_MAP.get(cat_id.lower(), 4)
         updates['categoryid'] = int(cat_id)
 
@@ -56,12 +70,13 @@ def update_product_metadata(product_id, **kwargs):
 
 def create_product(**kwargs):
     """Create a new product."""
-    name = kwargs.get('name', 'New Coffee Item')
+    name = kwargs.get('productname') or kwargs.get('name', 'New Coffee Item')
     price = float(kwargs.get('price', 0))
     desc = kwargs.get('description', '')
-    img = kwargs.get('image_url') or kwargs.get('emoji', '☕')
-    cat_id = kwargs.get('category_id', 1)
-    if isinstance(cat_id, str):
+    img = kwargs.get('imageurl') or kwargs.get('image_url') or kwargs.get('emoji', '☕')
+    cat_id = kwargs.get('categoryid') or kwargs.get('category_id', 1)
+    
+    if isinstance(cat_id, str) and not cat_id.isdigit():
         cat_id = CATEGORY_MAP.get(cat_id.lower(), 4)
 
     sql = """

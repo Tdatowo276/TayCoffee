@@ -15,6 +15,11 @@ load_dotenv()
 
 # Khởi động Server và nạp các Controllers
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB limit
+
+# Ensure upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')  # Bắt buộc để dùng session trong OAuth
 
 # Provide Mapbox token to all templates

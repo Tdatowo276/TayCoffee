@@ -10,18 +10,14 @@ let state = {
   currentPage: 1,
   perPage: 8,
   priceMin: 0,
-  priceMax: 9999,
+  priceMax: 999999999,
   searchQuery: '',
   promoApplied: null,
   shippingInfo: {
-    firstName: '',
-    lastName: '',
+    name: '',
     phone: '',
-    address: '',
-    city: '',
     notes: '',
-    calculatedFee: 0,
-    distance: 0,
+    tableId: null,
   },
   isCalculatingFee: false,
 };
@@ -81,10 +77,10 @@ function getAppBaseUrl() {
 }
 
 const PROMOS = {
-  'TAYCOFFEE20': { type: 'percent', value: 20, min: 20, desc: '20% off' },
-  'FIRE10': { type: 'flat', value: 10, min: 35, desc: '$10 off' },
-  'NEWBIE': { type: 'delivery', value: 2.99, min: 0, desc: 'Free delivery' },
+  'TAYCOFFEE20': { type: 'percent', value: 20, min: 100000, desc: 'Giảm 20%' },
+  'COFFEE10': { type: 'flat', value: 10000, min: 50000, desc: 'Giảm 10k' },
 };
+// 'NEWBIE' freeship removed for in-store
 
 const CATEGORIES = [
   { id: 'coffee', name: 'Cà Phê', icon: '☕', desc: 'Đặc sản cà phê vùng cao' },
@@ -328,7 +324,12 @@ window.addEventListener('load', async () => {
   updateAdminStats();
   setupScrollEffects();
   setupFadeAnimations();
-  document.getElementById('admin-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  // Fetch tables early
+  loadTables();
+  const adminDateEl = document.getElementById('admin-date');
+  if (adminDateEl) {
+    adminDateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
   setTimeout(() => restoreMenuVisibility(true), 300);
 });
 
@@ -425,10 +426,11 @@ function productCard(p) {
     .join('');
   const stars = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating));
 
-  // Display image URL if available, otherwise show emoji
-  const imageHtml = p.imageurl
+  // Display image URL if it's a real path, otherwise fallback to emoji
+  const hasImageUrl = p.imageurl && (p.imageurl.startsWith('http') || p.imageurl.startsWith('/') || p.imageurl.includes('.'));
+  const imageHtml = hasImageUrl
     ? `<img src="${p.imageurl}" alt="${p.name}" style="width:100%; height:100%; object-fit:cover;">`
-    : p.emoji;
+    : (`<span class="emoji-img">${p.emoji || p.imageurl || '☕'}</span>`);
 
   return `<div class="product-card" onclick="openProductDetail(${p.id})">
     ${p.tags.includes('best-seller') ? '<div class="badge">BEST SELLER</div>' : ''}
@@ -791,7 +793,6 @@ function requireLogin(fn, ...args) {
 }
 
 // ========== CART ==========
-function addToCart(productId, silent = false) {
   const p = PRODUCTS.find(x => x.id === productId);
   if (!p || !p.available) return;
   const existing = state.cart.find(i => i.id === productId);
@@ -799,7 +800,7 @@ function addToCart(productId, silent = false) {
   else state.cart.push({ id: productId, name: p.name, price: p.price, emoji: p.emoji, qty: 1 });
   updateCartCount();
   renderCartItems();
-  if (!silent) showToast(`${p.name} added to cart! ✅`);
+  if (!silent) showToast(`${p.name} đã thêm vào giỏ! ✅`);
 }
 
 function removeFromCart(id) {
@@ -840,7 +841,7 @@ function renderCartItems() {
   const list = document.getElementById('cart-items-list');
   const footer = document.getElementById('cart-footer');
   if (!state.cart.length) {
-    list.innerHTML = `<div class="cart-empty"><div class="cart-empty-icon">🛒</div><div style="font-family:var(--font-cond);font-size:16px;font-weight:700;letter-spacing:1px">Your cart is empty</div><div style="font-size:14px;color:var(--gray-text);text-align:center">Add some fire to your order!</div></div>`;
+    list.innerHTML = `<div class="cart-empty"><div class="cart-empty-icon">🛒</div><div style="font-family:var(--font-cond);font-size:16px;font-weight:700;letter-spacing:1px">Giỏ hàng trống</div><div style="font-size:14px;color:var(--gray-text);text-align:center">Hãy thêm món ngon vào giỏ ngay!</div></div>`;
     footer.style.display = 'none';
     return;
   }
@@ -849,12 +850,12 @@ function renderCartItems() {
       <div class="cart-item-img">${item.emoji.split("").slice(0, 2).join("")}</div>
       <div style="flex:1;min-width:0">
         <div class="cart-item-name">${item.name}</div>
-        <div class="cart-item-price">$${item.price.toFixed(2)} each</div>
+        <div class="cart-item-price">${item.price.toLocaleString('vi-VN')} VNĐ/món</div>
         <div class="cart-qty">
           <button class="qty-btn" onclick="changeQty('${item.id}',-1)">-</button>
           <span class="qty-num">${item.qty}</span>
           <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
-          <span style="font-family:var(--font-cond);font-size:13px;font-weight:700;color:var(--red-light);margin-left:8px">$${(item.price * item.qty).toFixed(2)}</span>
+          <span style="font-family:var(--font-cond);font-size:13px;font-weight:700;color:var(--red-light);margin-left:8px">${(item.price * item.qty).toLocaleString('vi-VN')} VNĐ</span>
         </div>
       </div>
       <button class="remove-item" onclick="removeFromCart('${item.id}')">✕</button>
@@ -865,7 +866,7 @@ function renderCartItems() {
 
 function computeCartTotals() {
   const subtotal = state.cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  let shippingFee = state.shippingInfo.calculatedFee || 0;
+  let shippingFee = 0; // No shipping for in-store
   let discount = 0;
   let promoCode = null;
 
@@ -874,10 +875,6 @@ function computeCartTotals() {
     promoCode = promo.code || null;
     if (promo.type === 'percent') discount = subtotal * promo.value / 100;
     else if (promo.type === 'flat') discount = promo.value;
-    else if (promo.type === 'delivery') {
-      discount = shippingFee;
-      shippingFee = 0;
-    }
   }
 
   discount = Math.min(discount, subtotal + shippingFee);
@@ -892,47 +889,39 @@ function updateCartTotals() {
   if (discountRow && discountValue) {
     if (totals.discount > 0) {
       discountRow.style.display = 'flex';
-      discountValue.textContent = `-$${totals.discount.toFixed(2)}`;
+      discountValue.textContent = `-${totals.discount.toLocaleString('vi-VN')} VNĐ`;
     } else {
       discountRow.style.display = 'none';
     }
   }
-  document.getElementById('cart-subtotal').textContent = `$${totals.subtotal.toFixed(2)}`;
+  document.getElementById('cart-subtotal').textContent = `${totals.subtotal.toLocaleString('vi-VN')} VNĐ`;
+  
+  // Hide delivery rows for in-store
   const cartDeliveryRow = document.getElementById('cart-delivery-row');
-  if (cartDeliveryRow) {
-    if (state.shippingInfo.distance > 0) {
-      cartDeliveryRow.style.display = 'flex';
-      document.getElementById('cart-delivery').textContent = `$${totals.shippingFee.toFixed(2)}`;
-    } else {
-      cartDeliveryRow.style.display = 'none';
-    }
-  }
+  if (cartDeliveryRow) cartDeliveryRow.style.display = 'none';
+  
   const coDeliveryValue = document.getElementById('co-delivery');
-  if (coDeliveryValue) {
-    if (state.shippingInfo.distance > 0) {
-      const distKm = (state.shippingInfo.distance / 1000).toFixed(1);
-      coDeliveryValue.innerHTML = `$${totals.shippingFee.toFixed(2)} <span style="font-size:12px;color:rgba(255,255,255,0.5);font-weight:400;margin-left:4px">(${distKm}km)</span>`;
-    } else {
-      coDeliveryValue.textContent = `$${totals.shippingFee.toFixed(2)}`;
-    }
-  }
-  document.getElementById('cart-total').textContent = `$${totals.total.toFixed(2)}`;
+  if (coDeliveryValue) coDeliveryValue.textContent = '0 VNĐ';
+
+  document.getElementById('cart-total').textContent = `${totals.total.toLocaleString('vi-VN')} VNĐ`;
+  
   const coSubtotal = document.getElementById('co-subtotal');
-  if (coSubtotal) coSubtotal.textContent = `$${totals.subtotal.toFixed(2)}`;
+  if (coSubtotal) coSubtotal.textContent = `${totals.subtotal.toLocaleString('vi-VN')} VNĐ`;
+  
   const coTotal = document.getElementById('co-total');
-  if (coTotal) coTotal.textContent = `$${totals.total.toFixed(2)}`;
+  if (coTotal) coTotal.textContent = `${totals.total.toLocaleString('vi-VN')} VNĐ`;
 }
 
 function applyPromo() {
   const code = document.getElementById('promo-input').value.trim().toUpperCase();
   if (!code) return;
   const promo = PROMOS[code];
-  if (!promo) { showToast('Invalid promo code', 'error'); return; }
+  if (!promo) { showToast('Mã giảm giá không hợp lệ', 'error'); return; }
   const sub = state.cart.reduce((s, i) => s + i.price * i.qty, 0);
-  if (sub < promo.min) { showToast(`Minimum order $${promo.min} required`, 'error'); return; }
+  if (sub < promo.min) { showToast(`Mô tả đơn hàng tối thiểu ${promo.min.toLocaleString('vi-VN')} VNĐ`, 'error'); return; }
   state.promoApplied = { ...promo, code };
   updateCartTotals();
-  showToast(`Promo applied! ${promo.desc} 🎫`, 'success');
+  showToast(`Đã áp dụng mã! ${promo.desc} 🎫`, 'success');
 }
 
 function openCart() {
@@ -947,187 +936,41 @@ function closeCart() {
   document.getElementById('cart-overlay').classList.remove('show');
 }
 
+async function loadTables() {
+  try {
+    const res = await APIClient.apiFetch('/tables');
+    const data = await res.json();
+    if (data.ok) {
+      const select = document.getElementById('table-select-checkout');
+      if (select) {
+        select.innerHTML = '<option value="">-- Chọn số bàn --</option>' +
+          data.items.map(t => `<option value="${t.tableid}">Bàn số ${t.tablenumber || t.tableid} (${t.status})</option>`).join('');
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load tables:', err);
+  }
+}
+
 // ========== CHECKOUT ==========
 function openCheckout() {
-  if (!state.cart.length) { showToast('Your cart is empty!', 'error'); return; }
+  if (!state.cart.length) { showToast('Giỏ hàng trống!', 'error'); return; }
   closeCart();
   const totals = computeCartTotals();
-  document.getElementById('co-subtotal').textContent = `$${totals.subtotal.toFixed(2)}`;
-  updateCartTotals(); // This will refresh co-delivery label
-  document.getElementById('co-total').textContent = `$${totals.total.toFixed(2)}`;
+  updateCartTotals();
   state.selectedPayment = 'cod';
   selectPayment('cod');
   setCheckoutStep(1);
   openModal('checkout-modal');
-
-  // Initialize Mapbox for address picking
-  setTimeout(initCheckoutMap, 300);
+  // Load tables if not already loaded or refresh
+  loadTables();
 }
 
 function initCheckoutMap() {
-  if (!window.mapboxgl) return;
-  mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
-
-  const mapContainer = document.getElementById('checkout-map');
-  if (!mapContainer) return;
-
-  checkoutMap = new mapboxgl.Map({
-    container: 'checkout-map',
-    style: 'mapbox://styles/mapbox/dark-v11',
-    center: [STORE_COORDS.lng, STORE_COORDS.lat],
-    zoom: 13
-  });
-
-  // Store Marker (ShisaFood)
-  const storeEl = document.createElement('div');
-  storeEl.className = 'store-marker';
-  storeEl.style.fontSize = '32px';
-  storeEl.innerHTML = '';
-
-  new mapboxgl.Marker(storeEl)
-    .setLngLat([STORE_COORDS.lng, STORE_COORDS.lat])
-    .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML('<h3>Tày Coffee - Cửa hàng</h3><p>Gọi ngay, phục vụ ngay!</p>'))
-    .addTo(checkoutMap);
-
-  checkoutMarker = new mapboxgl.Marker({ draggable: true, color: '#e8000d' })
-    .setLngLat([STORE_COORDS.lng, STORE_COORDS.lat])
-    .addTo(checkoutMap);
-
-  function onDragEnd() {
-    const lngLat = checkoutMarker.getLngLat();
-    updateShipCoords(lngLat.lat, lngLat.lng);
-  }
-  checkoutMarker.on('dragend', onDragEnd);
-
-  // Initial calculation for default spot (Store Coords)
-  updateShipCoords(STORE_COORDS.lat, STORE_COORDS.lng);
-
-  checkoutMap.on('click', (e) => {
-    checkoutMarker.setLngLat(e.lngLat);
-    updateShipCoords(e.lngLat.lat, e.lngLat.lng);
-  });
-
-  // Add Geocoder
-  const geocoderContainer = document.getElementById('geocoder-container');
-  if (geocoderContainer && !geocoderContainer.hasChildNodes()) {
-    geocoder = new MapboxGeocoder({
-      accessToken: mapboxgl.accessToken,
-      mapboxgl: mapboxgl,
-      marker: false,
-      placeholder: 'Search for address...'
-    });
-    geocoder.addTo('#geocoder-container');
-    geocoder.on('result', (e) => {
-      const coords = e.result.geometry.coordinates;
-      checkoutMarker.setLngLat(coords);
-      checkoutMap.flyTo({ center: coords, zoom: 15 });
-      updateShipCoords(coords[1], coords[0]);
-
-      document.getElementById('ship-address').value = e.result.place_name;
-
-      // Try to extract city from context
-      const cityContext = e.result.context?.find(c => c.id.startsWith('place'));
-      if (cityContext) {
-        document.getElementById('ship-city').value = cityContext.text;
-      } else {
-        document.getElementById('ship-city').value = 'London';
-      }
-    });
-  }
+  console.log('Mapbox checkout disabled for in-store mode.');
 }
-
 async function updateShipCoords(lat, lng) {
-  document.getElementById('ship-lat').value = lat;
-  document.getElementById('ship-lng').value = lng;
-
-  const continueBtn = document.querySelector('.checkout-continue-btn');
-  let rangeWarning = document.getElementById('range-warning');
-  if (!rangeWarning) {
-    rangeWarning = document.createElement('div');
-    rangeWarning.id = 'range-warning';
-    rangeWarning.style.color = '#e8000d';
-    rangeWarning.style.fontSize = '12px';
-    rangeWarning.style.marginTop = '8px';
-    rangeWarning.style.textAlign = 'center';
-    rangeWarning.style.fontWeight = '700';
-    continueBtn.parentNode.insertBefore(rangeWarning, continueBtn);
-  }
-
-  state.isCalculatingFee = true;
-  const placeBtn = document.querySelector('.checkout-place-btn');
-  if (placeBtn) {
-    placeBtn.disabled = true;
-    placeBtn.textContent = 'CALCULATING FEE...';
-  }
-
-  // 1. Reverse Geocode (Retrieve Address)
-  try {
-    const geoUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1`;
-    const geoRes = await fetch(geoUrl);
-    const geoData = await geoRes.json();
-    if (geoData.features && geoData.features.length > 0) {
-      const address = geoData.features[0].place_name;
-      document.getElementById('ship-address').value = address;
-      document.getElementById('ship-lat').value = lat;
-      document.getElementById('ship-lng').value = lng;
-      if (geocoder) geocoder.setInput(address);
-
-      const cityContext = geoData.features[0].context?.find(c => c.id.startsWith('place'));
-      if (cityContext) {
-        document.getElementById('ship-city').value = cityContext.text;
-      }
-    }
-  } catch (err) {
-    console.warn('Reverse geocoding failed:', err);
-  }
-
-  // 2. Calculate ETA and Distance
-  try {
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${STORE_COORDS.lng},${STORE_COORDS.lat};${lng},${lat}?access_token=${MAPBOX_ACCESS_TOKEN}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.routes && data.routes[0]) {
-      const distance = data.routes[0].distance; // meters
-      const duration = Math.round(data.routes[0].duration / 60) + 15; // +15 mins prep
-      const etaText = `${duration - 5}-${duration + 5} minutes`;
-
-      state.shippingInfo.estimatedEta = etaText;
-      state.shippingInfo.lat = lat;
-      state.shippingInfo.lng = lng;
-      state.shippingInfo.distance = distance;
-
-      // Fee logic: $1 if < 1km, $2/km if 1km to 10km.
-      if (distance < 1000) {
-        state.shippingInfo.calculatedFee = 1.00;
-      } else {
-        state.shippingInfo.calculatedFee = parseFloat(((distance / 1000) * 2.0).toFixed(2));
-      }
-
-      const etaDisplay = document.querySelector('.checkout-success-eta strong');
-      if (etaDisplay) etaDisplay.textContent = etaText;
-
-      // Range limit check (10km)
-      if (distance > 10000) {
-        rangeWarning.textContent = '? Out of delivery range (Max 10km)';
-        if (continueBtn) continueBtn.disabled = true;
-      } else {
-        rangeWarning.textContent = '';
-        if (continueBtn) continueBtn.disabled = false;
-      }
-
-      // Update cart totals immediately so the user sees the fee update
-      updateCartTotals();
-    }
-  } catch (err) {
-    console.warn('Mapbox Calculation failed:', err);
-  } finally {
-    state.isCalculatingFee = false;
-    const placeBtn = document.querySelector('.checkout-place-btn');
-    if (placeBtn) {
-      placeBtn.disabled = false;
-      placeBtn.textContent = 'PLACE ORDER ?';
-    }
-  }
+  // No-op for in-store
 }
 
 function setCheckoutStep(step) {
@@ -1160,122 +1003,111 @@ function selectPayment(method) {
 }
 
 function saveShippingInfo() {
-  const first = document.getElementById('ship-first').value.trim();
-  const last = document.getElementById('ship-last').value.trim();
+  const name = document.getElementById('ship-name').value.trim();
   const phone = document.getElementById('ship-phone').value.trim();
-  const address = document.getElementById('ship-address').value.trim();
-  const city = document.getElementById('ship-city').value.trim();
+  const tableId = document.getElementById('table-select-checkout').value;
   const notes = document.getElementById('ship-notes').value.trim();
 
-  if (!first || !last || !phone || !address) {
-    showToast('Please complete shipping information', 'error');
+  if (!name || !phone || !tableId) {
+    showToast('Vui lòng nhập đầy đủ thông tin và chọn số bàn', 'error');
     return false;
   }
 
-  Object.assign(state.shippingInfo, { firstName: first, lastName: last, phone, address, city, notes });
+  Object.assign(state.shippingInfo, { name, phone, tableId, notes });
   return true;
 }
 
 function resetCheckoutForm() {
-  ['ship-first', 'ship-last', 'ship-phone', 'ship-address', 'ship-city', 'ship-notes'].forEach(id => {
-    const input = document.getElementById(id);
-    if (input) input.value = '';
-  });
-  // Clear Geocoder
-  if (geocoder) geocoder.clear();
-  // Clear Coords
-  ['ship-lat', 'ship-lng'].forEach(id => {
+  const fields = ['ship-name', 'ship-phone', 'ship-notes', 'table-select-checkout'];
+  fields.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  state.shippingInfo = { firstName: '', lastName: '', phone: '', address: '', city: '', notes: '', lat: null, lng: null, estimatedEta: '', calculatedFee: 0, distance: 0 };
+  state.shippingInfo = { name: '', phone: '', tableId: null, notes: '' };
   state.selectedPayment = 'cod';
   selectPayment('cod');
 }
 
 async function placeOrder() {
-  if (isPlacingOrder || state.isCalculatingFee) {
-    if (state.isCalculatingFee) showToast('Still calculating shipping fee. Please wait...', 'info');
-    return false;
-  }
+  if (isPlacingOrder) return false;
   if (!state.currentUser || !state.currentUser.id) {
-    showToast('Please log in before placing an order', 'error');
+    showToast('Vui lòng đăng nhập trước khi đặt món', 'error');
     return false;
   }
   if (!state.cart.length) {
-    showToast('Your cart is empty!', 'error');
+    showToast('Giỏ hàng của bạn đang trống!', 'error');
     return false;
   }
 
-  if (!state.shippingInfo.firstName && !saveShippingInfo()) return false;
+  if (!saveShippingInfo()) return false;
   const shipping = state.shippingInfo;
-  if (!shipping.firstName || !shipping.lastName || !shipping.phone || !shipping.address) {
-    showToast('Please complete shipping information', 'error');
-    return false;
-  }
 
   const lineItems = state.cart
-    .map(item => ({ productId: Number(item.id), quantity: item.qty }))
-    .filter(item => Number.isInteger(item.productId) && item.productId > 0);
+    .map(item => ({ product_id: Number(item.id), quantity: item.qty }))
+    .filter(item => Number.isInteger(item.product_id) && item.product_id > 0);
+
   if (!lineItems.length) {
-    showToast('Some items are not linked to the menu yet. Please re-add them.', 'error');
+    showToast('Sản phẩm không hợp lệ, vui lòng thử lại.', 'error');
     return false;
   }
 
   const totals = computeCartTotals();
   const payload = {
     customer_id: state.currentUser.id,
-    customer_name: `${shipping.firstName} ${shipping.lastName}`.trim(),
-    items: lineItems.map(item => ({ product_id: item.productId, quantity: item.quantity })),
-    delivery_phone: shipping.phone,
-    delivery_address: shipping.address,
-    city: shipping.city || 'London',
+    table_id: Number(shipping.tableId),
+    items: lineItems,
     notes: shipping.notes,
     promotion_code: totals.promoCode,
-    shipping_fee: totals.shippingFee || state.shippingInfo.calculatedFee || 0,
-    payment_method: state.selectedPayment,
-    latitude: parseFloat(document.getElementById('ship-lat').value) || null,
-    longitude: parseFloat(document.getElementById('ship-lng').value) || null,
-    estimated_eta: state.shippingInfo.estimatedEta || '25-35 minutes',
+    payment_method: state.selectedPayment === 'cod' ? 'Cash' : state.selectedPayment,
   };
 
   const placeBtn = document.querySelector('.checkout-place-btn');
   isPlacingOrder = true;
   if (placeBtn) {
     placeBtn.disabled = true;
-    placeBtn.textContent = 'PROCESSING...';
+    placeBtn.textContent = 'ĐANG XỬ LÝ...';
   }
 
   try {
     const order = await APIClient.createOrder(payload);
-    const displayId = order.display_id || formatOrderDisplayId(order.order_id);
+    if (!order.ok) throw new Error(order.error || 'Đặt món không thành công');
+    
+    const displayId = formatOrderDisplayId(order.order_id);
     document.getElementById('order-id-display').textContent = displayId;
+    
+    // Add to local history
     const adminOrderRow = mapApiOrderToRow({
-      ...order,
       orderid: order.order_id,
-      orderstatus: order.status,
-      totalamount: order.total_amount,
-      orderdate: order.order_date,
-      items_summary: order.items_summary,
-      customername: order.customer_name || state.currentUser.name,
-      customerid: order.customer_id || state.currentUser.id,
+      orderstatus: 'pending',
+      totalamount: totals.total,
+      orderdate: new Date().toISOString(),
+      customername: state.currentUser.name,
+      customerid: state.currentUser.id,
+      tablenumber: document.getElementById('table-select-checkout').options[document.getElementById('table-select-checkout').selectedIndex].text
     });
+    
     ORDERS.push(adminOrderRow);
     if (!Array.isArray(state.currentUser.orders)) state.currentUser.orders = [];
     state.currentUser.orders.push(adminOrderRow);
+    
     state.cart = [];
     state.promoApplied = null;
     updateCartCount();
     renderCartItems();
     updateAdminStats();
     resetCheckoutForm();
-    renderOrdersModal();
-    showToast('Order placed successfully! 🎉', 'success');
+    showToast('Đặt món thành công! Chúc bạn ngon miệng 🎉', 'success');
     return true;
   } catch (err) {
     console.error('Place order error:', err);
-    showToast(err.message || 'Failed to place order', 'error');
+    showToast(err.message || 'Lỗi khi đặt món', 'error');
     return false;
+  } finally {
+    isPlacingOrder = false;
+    if (placeBtn) {
+      placeBtn.disabled = false;
+      placeBtn.textContent = 'HOÀN TẤT ĐẶT MÓN →';
+    }
   }
 }
 
@@ -1416,7 +1248,7 @@ function renderAdminRecentOrders() {
       <td><strong>${o.id}</strong></td>
       <td>${o.customer}</td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.items}</td>
-      <td style="color:var(--red-light);font-weight:700">$${(o.total || 0).toFixed(2)}</td>
+      <td style="color:var(--red-light);font-weight:700">${(o.total || 0).toLocaleString('vi-VN')} VNĐ</td>
       <td><span class="status-badge status-${o.status}">${o.status}</span></td>
       <td style="color:var(--gray-text)">${o.date}</td>
     </tr>`).join('');
