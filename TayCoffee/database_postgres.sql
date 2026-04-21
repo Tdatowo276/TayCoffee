@@ -127,7 +127,7 @@ CREATE TABLE Orders (
     SubTotal NUMERIC(18,2) NOT NULL CHECK (SubTotal >= 0),
     Discount NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (Discount >= 0),
     TotalAmount NUMERIC(18,2) GENERATED ALWAYS AS (SubTotal - Discount) STORED,
-    OrderStatus VARCHAR(30) NOT NULL DEFAULT 'pending' CHECK (OrderStatus IN ('pending','processing','completed','cancelled')),
+    OrderStatus VARCHAR(30) NOT NULL DEFAULT 'pending' CHECK (OrderStatus IN ('pending','processing','preparing','served','completed','cancelled')),
     Notes VARCHAR(255) NULL
 );
 

@@ -150,6 +150,22 @@ def process_payment(order_id):
     method = payload.get('method', 'Cash')
     return jsonify(payment_ctrl.process_payment(order_id, method))
 
+@api_bp.route('/orders/<int:order_id>/status', methods=['POST'])
+def update_order_status(order_id):
+    from models.orders import update_order_status
+    payload = request.get_json(silent=True) or {}
+    status = payload.get('status')
+    if not status:
+        return jsonify({"ok": False, "error": "Status is required"}), 400
+    valid_statuses = ['pending', 'preparing', 'served', 'completed', 'cancelled', 'processing']
+    if status not in valid_statuses:
+        return jsonify({"ok": False, "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"}), 400
+    try:
+        update_order_status(order_id, status)
+        return jsonify({"ok": True, "message": f"Order {order_id} updated to {status}"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 # ============================================================
 # 5. REPORTS
 # ============================================================

@@ -645,8 +645,6 @@
         width: 100%;
       }
     }
-
-
   </style>
 </head>
 
@@ -686,9 +684,9 @@
       <div class="a-sidebar-label">Management</div>
       <a class="a-nav-item" onclick="showPanel('products', this)"><span class="a-nav-icon">🍜</span>Products</a>
       <a class="a-nav-item" onclick="showPanel('orders', this)"><span class="a-nav-icon">📦</span>Orders</a>
-      <a class="a-nav-item" onclick="showPanel('users', this)"><span class="a-nav-icon">👥</span>Khách hàng</a>
-      <a class="a-nav-item" onclick="showPanel('shippers', this)"><span class="a-nav-icon">🤵</span>Nhân viên</a>
-      <a class="a-nav-item" onclick="showPanel('promos', this)"><span class="a-nav-icon">🎉</span>Khuyến mãi</a>
+      <a class="a-nav-item" onclick="showPanel('users', this)"><span class="a-nav-icon">👥</span>Customers</a>
+      <a class="a-nav-item" onclick="showPanel('shippers', this)"><span class="a-nav-icon">🤵</span>Employee</a>
+      <a class="a-nav-item" onclick="showPanel('promos', this)"><span class="a-nav-icon">🎉</span>Promotions</a>
 
       <div class="sidebar-note">Monitor sales, inventory và fulfillment hoàn toàn trong dashboard admin.</div>
     </aside>
@@ -866,16 +864,16 @@
             </div>
             <table class="a-table">
               <thead>
-                  <tr>
-                    <th>Đơn hàng</th>
-                    <th>Khách hàng</th>
-                    <th>Sản phẩm</th>
-                    <th>Tổng cộng</th>
-                    <th>Số bàn</th>
-                    <th>Trạng thái</th>
-                    <th>Thời gian</th>
-                    <th></th>
-                  </tr>
+                <tr>
+                  <th>Đơn hàng</th>
+                  <th>Khách hàng</th>
+                  <th>Sản phẩm</th>
+                  <th>Tổng cộng</th>
+                  <th>Số bàn</th>
+                  <th>Trạng thái</th>
+                  <th>Thời gian</th>
+                  <th></th>
+                </tr>
               </thead>
               <tbody id="orders-body"></tbody>
             </table>
@@ -888,8 +886,8 @@
           <div class="panel-card__body">
             <div class="panel-headline">
               <div>
-                <div class="eyebrow">Nhân sự</div>
-                <h2>Quản lý nhân viên</h2>
+                <div class="eyebrow">Customers</div>
+                <h2>Quản lý khách hàng</h2>
               </div>
               <div style="display:flex;gap:12px;flex-wrap:wrap;">
                 <input class="search-input" type="text" placeholder="🔍 Tìm nhân viên"
@@ -921,19 +919,19 @@
             <div class="panel-headline">
               <div>
                 <div class="eyebrow">Delivery network</div>
-                <h2>Shippers</h2>
+                <h2>Cashiers</h2>
               </div>
               <button class="btn btn-primary" onclick="openUserModal('shipper')">+ Add Shipper</button>
             </div>
             <table class="a-table">
               <thead>
                 <tr>
-                <th>Họ tên</th>
-                <th>SĐT</th>
-                <th>Đơn hàng</th>
-                <th>Trạng thái</th>
-                <th></th>
-              </tr>
+                  <th>Họ tên</th>
+                  <th>SĐT</th>
+                  <th>Đơn hàng</th>
+                  <th>Trạng thái</th>
+                  <th></th>
+                </tr>
               </thead>
               <tbody id="shippers-body"></tbody>
             </table>
@@ -1025,7 +1023,8 @@
     <div class="modal">
       <div class="modal-header" style="justify-content:space-between;align-items:center;gap:12px">
         <div>
-          <div style="font-family:var(--font-display);font-size:22px;letter-spacing:2px" id="user-modal-title">Quản lý nhân viên</div>
+          <div style="font-family:var(--font-display);font-size:22px;letter-spacing:2px" id="user-modal-title">Quản lý
+            nhân viên</div>
           <span id="u-status-pill" class="sbadge sbadge-success">Nhân viên</span>
         </div>
         <button class="modal-close" onclick="closeUserModal()">✕</button>
@@ -1102,8 +1101,8 @@
   <script src="/static/js/api-client.js"></script>
   <script src="/static/js/admin.js"></script>
   <script>
-  window.MAPBOX_ACCESS_TOKEN = "{{ mapbox_access_token }}";
-</script>
+    window.MAPBOX_ACCESS_TOKEN = "{{ mapbox_access_token }}";
+  </script>
 </body>
 
 </html>

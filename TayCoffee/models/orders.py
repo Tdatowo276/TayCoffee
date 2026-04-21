@@ -46,7 +46,12 @@ def deduct_ingredients(order_id: int):
 
 def get_all_orders(limit: int = 200):
     sql = """
-        SELECT o.*, u.fullname as customer_name, t.tablenumber 
+        SELECT o.*, u.fullname as customer_name, t.tablenumber,
+               (SELECT STRING_AGG(od2.quantity || 'x ' || p2.productname, ', ' ORDER BY od2.orderdetailid)
+                FROM OrderDetails od2
+                JOIN Products p2 ON od2.productid = p2.productid
+                WHERE od2.orderid = o.orderid
+               ) AS items_summary
         FROM Orders o
         LEFT JOIN Users u ON o.customerid = u.userid
         LEFT JOIN Tables t ON o.tableid = t.tableid

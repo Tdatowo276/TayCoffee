@@ -793,6 +793,7 @@ function requireLogin(fn, ...args) {
 }
 
 // ========== CART ==========
+function addToCart(productId, silent = false) {
   const p = PRODUCTS.find(x => x.id === productId);
   if (!p || !p.available) return;
   const existing = state.cart.find(i => i.id === productId);
@@ -938,7 +939,7 @@ function closeCart() {
 
 async function loadTables() {
   try {
-    const res = await APIClient.apiFetch('/tables');
+    const res = await fetch(`${API_BASE}/tables`);
     const data = await res.json();
     if (data.ok) {
       const select = document.getElementById('table-select-checkout');

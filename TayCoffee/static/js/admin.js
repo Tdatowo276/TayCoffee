@@ -264,8 +264,8 @@ async function loadAdminDataFromAPI() {
         dbId,
         customerId,
         shipperId,
-        customer: o.customer?.fullname || (customerId ? `Customer #${customerId}` : 'Customer'),
-        items: o.items_summary || o.notes || 'View order details',
+        customer: o.customer_name || (customerId ? `Customer #${customerId}` : 'Customer'),
+        items: o.items_summary || 'Xem chi tiết',
         subtotal: Number(o.subtotal || 0),
         shipping: Number(o.shippingfee || 0),
         discount: Number(o.discount || 0),
@@ -472,10 +472,11 @@ function renderOrders() {
               `<option value="${k}" ${k === o.status ? "selected" : ""}>${STATUS_MAP[k].label}</option>`,
           )
           .join("");
+        const notesHtml = o.notes ? `<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:4px;font-style:italic;">📝 ${o.notes}</div>` : '';
         return `<tr>
         <td>${o.id}</td>
         <td>${o.customer}</td>
-        <td class="muted">${o.items}</td>
+        <td class="muted">${o.items}${notesHtml}</td>
         <td>${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
         <td>${o.tableNumber}</td>
         <td>
