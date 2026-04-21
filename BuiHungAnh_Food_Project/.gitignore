@@ -27,6 +27,11 @@ wheels/
 .installed.cfg
 *.egg
 
+# Projects
+scratch/
+.gemini/
+*.log
+
 # IDEs
 .vscode/
 .idea/
