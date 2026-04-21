@@ -688,18 +688,19 @@ function closeProductModal() {
 async function saveProduct() {
   try {
     // Collect form data
+    const emojiInput = (document.getElementById("p-emoji").value || "").trim();
     const metadata = {
-      productname: (document.getElementById("p-name").value || "").trim(),
+      name: (document.getElementById("p-name").value || "").trim(),
       price: parseFloat(document.getElementById("p-price").value) || 0,
       description: (document.getElementById("p-desc").value || "").trim(),
-      categoryid: (document.getElementById("p-cat").value || "").trim(),
-      emoji: (document.getElementById("p-emoji").value || "").trim(),
-      isactive: document.getElementById("p-avail").value === "true",
+      category_id: parseInt((document.getElementById("p-cat").value || "4").trim(), 10),
+      image_url: emojiInput,
+      is_active: document.getElementById("p-avail").value === "true",
       tags: (document.getElementById("p-tags").value || "").trim(),
     };
 
     // Validate required fields
-    if (!metadata.productname) {
+    if (!metadata.name) {
       adminToast("Product name is required", "error");
       return;
     }
@@ -758,13 +759,13 @@ async function saveProduct() {
       (p) => p.id === Number(createdProductId),
     );
     if (product) {
-      product.productname = metadata.productname;
+      product.name = metadata.name;
       product.price = metadata.price;
       product.description = metadata.description;
-      product.categoryid = metadata.categoryid;
-      product.category = metadata.categoryid;
-      product.emoji = metadata.emoji;
-      product.isactive = metadata.isactive;
+      product.categoryid = metadata.category_id;
+      product.cat = mapCategory(metadata.category_id);
+      product.emoji = metadata.image_url;
+      product.available = metadata.is_active;
       product.tags = metadata.tags;
     }
 

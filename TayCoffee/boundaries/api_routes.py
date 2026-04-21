@@ -60,6 +60,23 @@ def create_product():
     payload = request.get_json(silent=True) or {}
     return jsonify({"ok": True, "product": create_product(**payload)})
 
+@api_bp.route('/admin/products/<product_id>', methods=['PUT'])
+def update_product(product_id):
+    from models.products import update_product_metadata
+    payload = request.get_json(silent=True) or {}
+    success = update_product_metadata(product_id, **payload)
+    if success:
+        return jsonify({"ok": True, "message": "Product updated"})
+    return jsonify({"ok": False, "error": "Failed to update product"}), 400
+
+@api_bp.route('/admin/products/<product_id>', methods=['DELETE'])
+def delete_product_route(product_id):
+    from models.products import delete_product
+    success, msg = delete_product(product_id)
+    if success:
+        return jsonify({"ok": True, "message": msg})
+    return jsonify({"ok": False, "error": msg}), 400
+
 # ============================================================
 # 3. ORDERS & TABLES
 # ============================================================

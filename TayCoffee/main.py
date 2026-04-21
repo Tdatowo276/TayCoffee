@@ -139,11 +139,11 @@ def fix_admin_password():
                         "UPDATE Users SET passwordhash = %s WHERE email = %s",
                         [correct_cashier_hash, 'cashier@taycoffee.vn']
                     )
-            print("[STARTUP] ✅ Password hashes fixed successfully!")
+            print("[STARTUP] Password hashes fixed successfully!")
         else:
-            print("[STARTUP] ✅ Admin password hash is correct.")
+            print("[STARTUP] Admin password hash is correct.")
     except Exception as e:
-        print(f"[STARTUP] ⚠️ Could not fix admin password: {e}")
+        print(f"[STARTUP] Could not fix admin password: {e}")
 
 
 if __name__ == '__main__':

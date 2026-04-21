@@ -33,19 +33,23 @@ def handle_social_login(user_info, provider_name):
         'role_id': user['roleid']
     }
 
+    import json
+    user_dict = {
+        "id": user['userid'],
+        "name": user['fullname'],
+        "email": user['email'],
+        "role": "customer",
+        "role_id": user['roleid'] or 3
+    }
+    user_json = json.dumps(user_dict)
+
     # Set local storage using script block
     return f"""
     <html>
     <head>
         <script>
             localStorage.setItem('tay_coffee_current_user_email', '{user['email']}');
-            localStorage.setItem('tay_coffee_current_user', JSON.stringify({{
-                "id": "{user['userid']}",
-                "name": "{user['fullname']}",
-                "email": "{user['email']}",
-                "role": "staff",
-                "role_id": {user['roleid']}
-            }}));
+            localStorage.setItem('tay_coffee_current_user', JSON.stringify({user_json}));
             window.location.href = '/';
         </script>
     </head>

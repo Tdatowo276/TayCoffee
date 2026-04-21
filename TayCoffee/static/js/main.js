@@ -10,7 +10,7 @@ let state = {
   currentPage: 1,
   perPage: 8,
   priceMin: 0,
-  priceMax: 9999,
+  priceMax: 9999999,
   searchQuery: '',
   promoApplied: null,
   shippingInfo: {
@@ -383,7 +383,7 @@ function renderCategories() {
 function filterByCat(catId) {
   state.currentFilter = catId;
   state.currentPage = 1;
-  state.priceMin = 0; state.priceMax = 9999;
+  state.priceMin = 0; state.priceMax = 9999999;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   renderProducts();
   document.getElementById('menu').scrollIntoView({ behavior: 'smooth' });
@@ -442,7 +442,7 @@ function productCard(p) {
         <div class="product-rating"><span class="stars" style="font-size:11px">${stars}</span> ${p.rating}</div>
       </div>
       <div class="product-actions" onclick="event.stopPropagation()">
-        <button class="add-to-cart" onclick="requireLogin(addToCart, ${p.id})" ${!p.available ? 'disabled' : ''}>${p.available ? '🛒 Add to Cart' : 'Sold Out'}</button>
+        <button class="add-to-cart" onclick="addToCart(${p.id})" ${!p.available ? 'disabled' : ''}>${p.available ? '🛒 Add to Cart' : 'Sold Out'}</button>
         <button class="wishlist-btn" onclick="showToast('Added to wishlist!','info')">♡</button>
       </div>
     </div>
@@ -481,7 +481,7 @@ function setFilter(filter, btn) {
   state.currentFilter = filter;
   state.currentPage = 1;
   state.priceMin = 0;
-  state.priceMax = 9999;
+  state.priceMax = 9999999;
   document
     .querySelectorAll('.filter-btn')
     .forEach((b) => b.classList.remove('active'));
@@ -546,13 +546,11 @@ function restoreMenuVisibility(force = false) {
 
 function addFromModal() {
   if (!state.currentProduct) return;
-  requireLogin(() => {
-    for (let i = 0; i < state.detailQty; i++) {
-      addToCart(state.currentProduct.id, true);
-    }
-    showToast(`${state.detailQty}x ${state.currentProduct.name} added to cart! ✅`);
-    closeModal('product-modal');
-  });
+  for (let i = 0; i < state.detailQty; i++) {
+    addToCart(state.currentProduct.id, true);
+  }
+  showToast(`${state.detailQty}x ${state.currentProduct.name} added to cart! ✅`);
+  closeModal('product-modal');
 }
 
 function renderProductReviews(p) {
@@ -732,13 +730,13 @@ function onLoginSuccess(showWelcomeToast = true) {
       target = '/admin/dashboard';
     } else if (state.currentUser.role === 'shipper') {
       target = '/shipper/workspace';
-    } else {
-      target = '/customer';
     }
 
-    setTimeout(() => {
-      window.location.href = `${getAppBaseUrl()}${target}`;
-    }, 250);
+    if (target) {
+      setTimeout(() => {
+        window.location.href = `${getAppBaseUrl()}${target}`;
+      }, 250);
+    }
   }
 }
 
@@ -936,7 +934,6 @@ function applyPromo() {
 }
 
 function openCart() {
-  if (!state.currentUser) { openModal('login-modal'); return; }
   renderCartItems();
   document.getElementById('cart-sidebar').classList.add('open');
   document.getElementById('cart-overlay').classList.add('show');

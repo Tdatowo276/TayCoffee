@@ -17,6 +17,20 @@ function resolveApiBase() {
 
 const API_BASE = resolveApiBase();
 
+/**
+ * Fetch with timeout
+ */
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 class APIClient {
   /**
    * Fetch user login
@@ -72,7 +86,7 @@ class APIClient {
    */
   static async getUsers(limit = 100) {
     try {
-      const res = await fetch(`${API_BASE}/users?limit=${limit}`);
+      const res = await fetchWithTimeout(`${API_BASE}/users?limit=${limit}`, {}, 5000);
       const text = await res.text();
       if (!text) return [];
       const data = JSON.parse(text);
@@ -93,7 +107,7 @@ class APIClient {
    */
   static async getProducts(limit = 100) {
     try {
-      const res = await fetch(`${API_BASE}/products?limit=${limit}`);
+      const res = await fetchWithTimeout(`${API_BASE}/products?limit=${limit}`, {}, 5000);
       const text = await res.text();
       if (!text) return [];
       const data = JSON.parse(text);
@@ -114,7 +128,7 @@ class APIClient {
    */
   static async getOrders(limit = 100) {
     try {
-      const res = await fetch(`${API_BASE}/orders?limit=${limit}`);
+      const res = await fetchWithTimeout(`${API_BASE}/orders?limit=${limit}`, {}, 5000);
       const text = await res.text();
       if (!text) return [];
       const data = JSON.parse(text);
