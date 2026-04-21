@@ -11,10 +11,29 @@ from models.users import (
     update_user,
 )
 
+from models.orders import get_all_tables, get_inventory_status
+
 admin_api_bp = Blueprint('admin_api', __name__, url_prefix='/api/admin')
 
 ROLE_ID_TO_NAME = {v: k for k, v in ROLE_NAME_TO_ID.items()}
 
+@admin_api_bp.route('/tables', methods=['GET'])
+def admin_list_tables():
+    rows = get_all_tables()
+    return jsonify({
+        "ok": True,
+        "count": len(rows),
+        "items": rows
+    }), 200
+
+@admin_api_bp.route('/inventory', methods=['GET'])
+def admin_get_inventory():
+    rows = get_inventory_status()
+    return jsonify({
+        "ok": True,
+        "count": len(rows),
+        "items": rows
+    }), 200
 
 def _serialize_user(row):
     if not row:
@@ -64,7 +83,7 @@ def admin_create_user():
     email = (payload.get('email') or '').strip().lower()
     phone = (payload.get('phone') or '').strip() or None
     password = payload.get('password') or ''
-    role_id = _resolve_role(payload) or ROLE_NAME_TO_ID['customer']
+    role_id = _resolve_role(payload) or ROLE_NAME_TO_ID['staff']
 
     errors = []
     if not full_name:
@@ -73,8 +92,8 @@ def admin_create_user():
         errors.append('email is required')
     if not password:
         errors.append('password is required')
-    if role_id not in (ROLE_NAME_TO_ID['customer'], ROLE_NAME_TO_ID['shipper']):
-        errors.append('role must be customer or shipper')
+    if role_id not in (ROLE_NAME_TO_ID['staff'], ROLE_NAME_TO_ID['cashier']):
+        errors.append('role must be staff or cashier')
 
     if errors:
         return jsonify({"ok": False, "error": '; '.join(errors)}), 400

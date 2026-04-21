@@ -1,18 +1,19 @@
 /*
-  PostgreSQL schema for Supabase - SHISAFOOD
-  Converted from SQL Server schema in database.sql
-  Note: Run this in Supabase SQL Editor.
+  PostgreSQL schema for TÀY COFFEE - Local Management System
+  Optimized for LAN deployment.
 */
 
 /* =========================================================
    Drop objects (safe re-run)
-========================================================= */
+   ========================================================= */
 DROP VIEW IF EXISTS vw_DailyRevenue;
 
 DROP TABLE IF EXISTS OrderCombos CASCADE;
 DROP TABLE IF EXISTS OrderDetails CASCADE;
 DROP TABLE IF EXISTS Payments CASCADE;
 DROP TABLE IF EXISTS Orders CASCADE;
+DROP TABLE IF EXISTS Recipes CASCADE;
+DROP TABLE IF EXISTS Ingredients CASCADE;
 DROP TABLE IF EXISTS ComboItems CASCADE;
 DROP TABLE IF EXISTS Combos CASCADE;
 DROP TABLE IF EXISTS ProductReviews CASCADE;
@@ -21,13 +22,15 @@ DROP TABLE IF EXISTS Wishlists CASCADE;
 DROP TABLE IF EXISTS Promotions CASCADE;
 DROP TABLE IF EXISTS Products CASCADE;
 DROP TABLE IF EXISTS Categories CASCADE;
+DROP TABLE IF EXISTS Tables CASCADE;
+DROP TABLE IF EXISTS Shifts CASCADE;
 DROP TABLE IF EXISTS UserAddresses CASCADE;
 DROP TABLE IF EXISTS Users CASCADE;
 DROP TABLE IF EXISTS Roles CASCADE;
 
 /* =========================================================
-   Identity / User
-========================================================= */
+   Identity / User / Roles
+   ========================================================= */
 CREATE TABLE Roles (
     RoleID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     RoleName VARCHAR(30) NOT NULL UNIQUE
@@ -38,28 +41,33 @@ CREATE TABLE Users (
     FullName VARCHAR(120) NOT NULL,
     Email VARCHAR(150) NOT NULL UNIQUE,
     Phone VARCHAR(15) NULL,
-    PasswordHash VARCHAR(255) NOT NULL,
+    PasswordHash VARCHAR(255) NOT NULL, -- SHA-256
     RoleID INT NOT NULL REFERENCES Roles(RoleID),
     IsActive BOOLEAN NOT NULL DEFAULT TRUE,
     CreatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IX_Users_Phone_NotNull
-ON Users(Phone)
-WHERE Phone IS NOT NULL;
-
-CREATE TABLE UserAddresses (
-    AddressID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    UserID INT NOT NULL REFERENCES Users(UserID),
-    FullAddress VARCHAR(255) NOT NULL,
-    City VARCHAR(100) NULL,
-    IsDefault BOOLEAN NOT NULL DEFAULT FALSE,
-    CreatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE Shifts (
+    ShiftID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    EmployeeID INT NOT NULL REFERENCES Users(UserID),
+    StartTime TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    EndTime TIMESTAMPTZ NULL,
+    Status VARCHAR(20) DEFAULT 'active' -- active, completed
 );
 
 /* =========================================================
-   Catalog
-========================================================= */
+   Restaurant Layout (Tables)
+   ========================================================= */
+CREATE TABLE Tables (
+    TableID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    TableNumber VARCHAR(10) NOT NULL UNIQUE,
+    Capacity INT DEFAULT 4,
+    Status VARCHAR(20) NOT NULL DEFAULT 'Empty' CHECK (Status IN ('Empty', 'Occupied', 'Reserved'))
+);
+
+/* =========================================================
+   Catalog & Menu
+   ========================================================= */
 CREATE TABLE Categories (
     CategoryID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     CategoryName VARCHAR(100) NOT NULL UNIQUE
@@ -71,35 +79,33 @@ CREATE TABLE Products (
     ProductName VARCHAR(120) NOT NULL,
     Description VARCHAR(600) NULL,
     Price NUMERIC(18,2) NOT NULL CHECK (Price >= 0),
-    StockQuantity INT NOT NULL DEFAULT 0 CHECK (StockQuantity >= 0),
-    ImageURL VARCHAR(500) NULL,
+    StockQuantity INT NOT NULL DEFAULT 100 CHECK (StockQuantity >= 0), -- For pre-packaged items
+    ImageURL VARCHAR(500) NULL, -- Can store emoji or URL
     IsActive BOOLEAN NOT NULL DEFAULT TRUE,
     CreatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 /* =========================================================
-   Combo
-========================================================= */
-CREATE TABLE Combos (
-    ComboID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    ComboCode VARCHAR(50) NOT NULL UNIQUE,
-    ComboName VARCHAR(120) NOT NULL,
-    Description VARCHAR(400) NULL,
-    Price NUMERIC(18,2) NOT NULL CHECK (Price >= 0),
-    IsActive BOOLEAN NOT NULL DEFAULT TRUE,
-    CreatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
+   Inventory & Recipes (Automated Deduction)
+   ========================================================= */
+CREATE TABLE Ingredients (
+    IngredientID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    IngredientName VARCHAR(120) NOT NULL UNIQUE,
+    Unit VARCHAR(20) NOT NULL, -- g, ml, piece
+    StockAmount NUMERIC(18,2) NOT NULL DEFAULT 0,
+    MinStockThreshold NUMERIC(18,2) DEFAULT 100
 );
 
-CREATE TABLE ComboItems (
-    ComboItemID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    ComboID INT NOT NULL REFERENCES Combos(ComboID),
+CREATE TABLE Recipes (
+    RecipeID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     ProductID INT NOT NULL REFERENCES Products(ProductID),
-    Quantity INT NOT NULL CHECK (Quantity > 0)
+    IngredientID INT NOT NULL REFERENCES Ingredients(IngredientID),
+    QuantityNeeded NUMERIC(18,2) NOT NULL CHECK (QuantityNeeded > 0)
 );
 
 /* =========================================================
-   Promotion
-========================================================= */
+   Sales & Payments
+   ========================================================= */
 CREATE TABLE Promotions (
     PromotionID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     Code VARCHAR(30) NOT NULL UNIQUE,
@@ -108,61 +114,21 @@ CREATE TABLE Promotions (
     MinOrderAmount NUMERIC(18,2) NOT NULL DEFAULT 0,
     IsActive BOOLEAN NOT NULL DEFAULT TRUE,
     StartDate TIMESTAMPTZ NULL,
-    EndDate TIMESTAMPTZ NULL,
-    CreatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    EndDate TIMESTAMPTZ NULL
 );
 
-/* =========================================================
-   Wishlist + Reviews
-========================================================= */
-CREATE TABLE Wishlists (
-    WishlistID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    UserID INT NOT NULL UNIQUE REFERENCES Users(UserID),
-    CreatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE WishlistItems (
-    WishlistItemID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    WishlistID INT NOT NULL REFERENCES Wishlists(WishlistID),
-    ProductID INT NOT NULL REFERENCES Products(ProductID),
-    CreatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (WishlistID, ProductID)
-);
-
-CREATE TABLE ProductReviews (
-    ReviewID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    ProductID INT NOT NULL REFERENCES Products(ProductID),
-    UserID INT NOT NULL REFERENCES Users(UserID),
-    Stars SMALLINT NOT NULL CHECK (Stars BETWEEN 1 AND 5),
-    ReviewText VARCHAR(1000) NOT NULL,
-    CreatedAt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    IsVisible BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-/* =========================================================
-   Orders + Payments
-========================================================= */
 CREATE TABLE Orders (
     OrderID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    CustomerID INT NOT NULL REFERENCES Users(UserID),
-    ShipperID INT NULL REFERENCES Users(UserID),
-    AddressID INT NULL REFERENCES UserAddresses(AddressID),
+    CustomerID INT NULL REFERENCES Users(UserID),
+    TableID INT NULL REFERENCES Tables(TableID),
+    EmployeeID INT NULL REFERENCES Users(UserID),
     PromotionID INT NULL REFERENCES Promotions(PromotionID),
     OrderDate TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    DeliveredDate TIMESTAMPTZ NULL,
-    DeliveryPhone VARCHAR(15) NULL,
     SubTotal NUMERIC(18,2) NOT NULL CHECK (SubTotal >= 0),
-    ShippingFee NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (ShippingFee >= 0),
     Discount NUMERIC(18,2) NOT NULL DEFAULT 0 CHECK (Discount >= 0),
-    TotalAmount NUMERIC(18,2) GENERATED ALWAYS AS ((SubTotal + ShippingFee) - Discount) STORED,
-    OrderStatus VARCHAR(30) NOT NULL DEFAULT 'pending' CHECK (OrderStatus IN ('pending','waiting_for_shipper','shipping','completed','cancelled')),
-    Notes VARCHAR(255) NULL,
-    latitude DOUBLE PRECISION NULL,
-    longitude DOUBLE PRECISION NULL,
-    shipper_lat DOUBLE PRECISION NULL,
-    shipper_lng DOUBLE PRECISION NULL,
-    estimated_delivery_time VARCHAR(255) NULL,
-    actual_delivery_start TIMESTAMPTZ NULL
+    TotalAmount NUMERIC(18,2) GENERATED ALWAYS AS (SubTotal - Discount) STORED,
+    OrderStatus VARCHAR(30) NOT NULL DEFAULT 'pending' CHECK (OrderStatus IN ('pending','processing','completed','cancelled')),
+    Notes VARCHAR(255) NULL
 );
 
 CREATE TABLE OrderDetails (
@@ -170,128 +136,75 @@ CREATE TABLE OrderDetails (
     OrderID INT NOT NULL REFERENCES Orders(OrderID),
     ProductID INT NOT NULL REFERENCES Products(ProductID),
     Quantity INT NOT NULL CHECK (Quantity > 0),
-    UnitPrice NUMERIC(18,2) NOT NULL CHECK (UnitPrice >= 0)
-);
-
-CREATE TABLE OrderCombos (
-    OrderComboID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    OrderID INT NOT NULL REFERENCES Orders(OrderID),
-    ComboID INT NOT NULL REFERENCES Combos(ComboID),
-    Quantity INT NOT NULL CHECK (Quantity > 0),
-    UnitPrice NUMERIC(18,2) NOT NULL CHECK (UnitPrice >= 0)
+    UnitPrice NUMERIC(18,2) NOT NULL CHECK (UnitPrice >= 0),
+    OrderNote VARCHAR(255) NULL -- Details like "less sugar", "extra ice"
 );
 
 CREATE TABLE Payments (
     PaymentID INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     OrderID INT NOT NULL REFERENCES Orders(OrderID),
     Amount NUMERIC(18,2) NOT NULL CHECK (Amount >= 0),
-    Method VARCHAR(20) NOT NULL CHECK (Method IN ('Cash','Card','BankTransfer','Momo')),
+    Method VARCHAR(20) NOT NULL CHECK (Method IN ('Cash','Card','BankTransfer','QR')),
     Status VARCHAR(20) NOT NULL DEFAULT 'unpaid' CHECK (Status IN ('unpaid','paid','failed','refunded')),
     PaidAt TIMESTAMPTZ NULL
 );
 
 /* =========================================================
-   View
-========================================================= */
-CREATE VIEW vw_DailyRevenue AS
-SELECT
-    CAST(o.DeliveredDate AS DATE) AS ReportDate,
-    COUNT(DISTINCT o.OrderID) AS TotalOrders,
-    SUM(o.SubTotal) AS FoodRevenue,
-    SUM(o.ShippingFee) AS ShippingRevenue,
-    SUM(o.Discount) AS DiscountAmount,
-    SUM(o.TotalAmount) AS NetRevenue
-FROM Orders o
-JOIN Payments p ON p.OrderID = o.OrderID
-WHERE o.OrderStatus = 'completed'
-  AND p.Status = 'paid'
-GROUP BY CAST(o.DeliveredDate AS DATE);
-
-/* =========================================================
-   Seed data
-========================================================= */
-INSERT INTO Roles (RoleName)
-VALUES ('Admin'), ('Shipper'), ('Customer');
-
-INSERT INTO Users (FullName, Email, Phone, PasswordHash, RoleID)
-VALUES
-('Admin User', 'admin@shisa.com', '0901234567', 'hashed_admin', 1),
-('Shipper User', 'shipper@shisa.com', '0987654321', 'hashed_shipper', 2),
-('Customer Demo', 'customer@shisa.com', '0911223344', 'hashed_customer', 3);
-
-INSERT INTO UserAddresses (UserID, FullAddress, City, IsDefault)
-VALUES
-(3, '123 Fire Street, Hoan Kiem', 'Hanoi', TRUE);
-
-INSERT INTO Categories (CategoryName)
-VALUES ('Noodles'), ('Pizza'), ('Beverages'), ('Sides');
-
-INSERT INTO Products (CategoryID, ProductName, Description, Price, StockQuantity, IsActive)
-VALUES
-(1, 'Volcano Noodles', 'Bold spicy noodles.', 14.99, 50, TRUE),
-(2, 'Shisa Spicy Pizza', 'Spicy signature pizza.', 16.99, 40, TRUE),
-(3, 'Dragon Bubble Tea', 'Bubble tea with unique flavor.', 5.49, 100, TRUE),
-(4, 'Volcano Fries', 'Crispy spicy fries.', 5.99, 120, TRUE);
-
-INSERT INTO Combos (ComboCode, ComboName, Description, Price, IsActive)
-VALUES
-('noodle-drink-combo', 'Noodle + Drink Combo', 'One noodle and one drink.', 17.99, TRUE),
-('pizza-party-combo', 'Pizza Party Set', 'Pizza, fries, and drinks.', 29.99, TRUE),
-('mega-feast-combo', 'Mega Shisa Feast', 'Big meal combo.', 44.99, TRUE);
-
-INSERT INTO ComboItems (ComboID, ProductID, Quantity)
-VALUES
-(1, 1, 1),
-(1, 3, 1),
-(2, 2, 1),
-(2, 4, 1),
-(3, 1, 1),
-(3, 2, 1),
-(3, 3, 1),
-(3, 4, 1);
-
-INSERT INTO Promotions (Code, DiscountType, DiscountValue, MinOrderAmount, IsActive)
-VALUES
-('SHISA20', 'percent', 20, 20, TRUE),
-('FIRE10', 'flat', 10, 35, TRUE),
-('NEWBIE', 'delivery', 2.99, 0, TRUE);
-
-INSERT INTO Wishlists (UserID)
-VALUES (3);
-
-INSERT INTO WishlistItems (WishlistID, ProductID)
-VALUES (1, 2), (1, 4);
-
-INSERT INTO Orders (CustomerID, ShipperID, AddressID, PromotionID, DeliveryPhone, SubTotal, ShippingFee, Discount, OrderStatus)
-VALUES (3, NULL, 1, 1, '0911223344', 32.97, 2.99, 6.59, 'pending');
-
-INSERT INTO OrderDetails (OrderID, ProductID, Quantity, UnitPrice)
-VALUES
-(1, 1, 1, 14.99),
-(1, 3, 1, 5.49),
-(1, 4, 2, 5.99);
-
-INSERT INTO OrderCombos (OrderID, ComboID, Quantity, UnitPrice)
-VALUES (1, 1, 1, 17.99);
-
-INSERT INTO Payments (OrderID, Amount, Method, Status)
-VALUES (1, 29.37, 'Cash', 'unpaid');
-
-INSERT INTO ProductReviews (ProductID, UserID, Stars, ReviewText)
-VALUES
-(1, 3, 5, 'Amazing spicy flavor!'),
-(2, 3, 4, 'Great pizza and crust.');
-
-/* =========================================================
-   Migrations / Schema Updates (Run in Supabase SQL Editor)
+   Seed Data
    ========================================================= */
 
--- 1. Add delivery columns to Orders table
--- ALTER TABLE Orders ADD COLUMN latitude DOUBLE PRECISION;
--- ALTER TABLE Orders ADD COLUMN longitude DOUBLE PRECISION;
--- ALTER TABLE Orders ADD COLUMN shipper_lat DOUBLE PRECISION;
--- ALTER TABLE Orders ADD COLUMN shipper_lng DOUBLE PRECISION;
--- ALTER TABLE Orders ADD COLUMN estimated_delivery_time VARCHAR(255);
--- ALTER TABLE Orders ADD COLUMN actual_delivery_start TIMESTAMP WITH TIME ZONE;
--- ALTER TABLE Orders DROP CONSTRAINT IF EXISTS orders_orderstatus_check;
--- ALTER TABLE Orders ADD CONSTRAINT orders_orderstatus_check CHECK (OrderStatus IN ('pending','waiting_for_shipper','shipping','completed','cancelled'));
+-- Roles
+INSERT INTO Roles (RoleName) VALUES ('Admin'), ('Cashier'), ('Staff');
+
+-- Users (Password is 'admin123' hashed with SHA-256 for demo)
+-- Hashed 'admin123': 240be518ebb2146c006a9a83c77d9884730415d8f2038756bf0500d075a34a4c
+INSERT INTO Users (FullName, Email, Phone, PasswordHash, RoleID) VALUES
+('Quản lý Tày', 'admin@taycoffee.vn', '0901234567', '240be518ebb2146c006a9a83c77d9884730415d8f2038756bf0500d075a34a4c', 1),
+('Thu ngân 1', 'cashier@taycoffee.vn', '0987654321', '240be518ebb2146c006a9a83c77d9884730415d8f2038756bf0500d075a34a4c', 2);
+
+-- Categories
+INSERT INTO Categories (CategoryName) VALUES ('Cà phê'), ('Trà'), ('Bánh ngọt'), ('Khác');
+
+-- Products
+INSERT INTO Products (CategoryID, ProductName, Description, Price, ImageURL) VALUES
+(1, 'Cà phê Muối', 'Signature salty cream coffee.', 35000, '☕'),
+(1, 'Bạc xỉu', 'Classic Vietnamese white coffee.', 29000, '🥤'),
+(2, 'Trà Đào Cam Sả', 'Refreshing peach tea with lemongrass.', 45000, '🍑'),
+(3, 'Bánh Croissant', 'Buttery flaky pastry.', 25000, '🥐');
+
+-- Ingredients
+INSERT INTO Ingredients (IngredientName, Unit, StockAmount) VALUES
+('Hạt cà phê Robusta', 'g', 5000),
+('Sữa đặc', 'ml', 2000),
+('Muối kem', 'g', 1000),
+('Trà đào túi lọc', 'piece', 100),
+('Bột mì', 'g', 5000);
+
+-- Recipes
+INSERT INTO Recipes (ProductID, IngredientID, QuantityNeeded) VALUES
+(1, 1, 20), -- Cà phê Muối: 20g cà phê
+(1, 2, 30), -- Cà phê Muối: 30ml sữa đặc
+(1, 3, 10), -- Cà phê Muối: 10g muối kem
+(2, 1, 20), -- Bạc xỉu: 20g cà phê
+(2, 2, 50); -- Bạc xỉu: 50ml sữa đặc
+
+-- Tables
+INSERT INTO Tables (TableNumber, Capacity, Status) VALUES
+('Bàn 01', 2, 'Empty'),
+('Bàn 02', 2, 'Empty'),
+('Bàn 03', 4, 'Empty'),
+('Bàn 04', 4, 'Occupied'),
+('Bàn 05', 6, 'Empty');
+
+-- Promotions
+INSERT INTO Promotions (Code, DiscountType, DiscountValue, MinOrderAmount) VALUES
+('TAYNEW', 'percent', 15, 50000),
+('COFFEE5', 'flat', 5000, 30000);
+
+-- Orders Demo
+INSERT INTO Orders (TableID, EmployeeID, SubTotal, Discount, OrderStatus) VALUES
+(4, 2, 64000, 0, 'processing');
+
+INSERT INTO OrderDetails (OrderID, ProductID, Quantity, UnitPrice, OrderNote) VALUES
+(1, 1, 1, 35000, 'Ít đường'),
+(1, 2, 1, 29000, 'Nhiều đá');

@@ -1,306 +1,136 @@
-from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from typing import Dict, Iterable, List, Tuple
-
-from models.supabase_client import get_supabase
+from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Dict, List
+from models.db_client import execute_query, execute_insert_returning
 
 TWOPLACES = Decimal('0.01')
-DEFAULT_SHIPPING_FEE = Decimal('2.00')
-PAYMENT_METHOD_MAP = {
-    'cod': 'Cash',
-    'cash': 'Cash',
-    'card': 'Card',
-    'momo': 'Momo',
-    'wallet': 'Momo',
-    'bank': 'BankTransfer',
-    'banktransfer': 'BankTransfer',
-}
-STORE_COORDS = {'lat': 51.5033, 'lng': -0.1182}
-
-
-def _to_decimal(value, default: Decimal | str = '0') -> Decimal:
-    if isinstance(value, Decimal):
-        return value
-    default_val = Decimal(str(default))
-    try:
-        return Decimal(str(value))
-    except (InvalidOperation, TypeError, ValueError):
-        return default_val
-
 
 def _quantize_money(value: Decimal) -> Decimal:
-    return value.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+    return Decimal(str(value)).quantize(TWOPLACES, rounding=ROUND_HALF_UP)
 
+def get_all_tables():
+    """Lấy danh sách bàn và trạng thái hiện tại."""
+    sql = "SELECT * FROM Tables ORDER BY tablenumber"
+    return execute_query(sql, fetch=True)
 
-def _format_display_id(order_id: int) -> str:
-    return f"#SF-{int(order_id):04d}"
+def get_inventory_status():
+    """Lấy danh sách nguyên liệu và mức tồn kho."""
+    sql = "SELECT * FROM Ingredients ORDER BY ingredientname"
+    return execute_query(sql, fetch=True)
 
-
-def _parse_iso_datetime(raw_value):
-    if not raw_value:
-        return None
-    if isinstance(raw_value, datetime):
-        return raw_value
+def deduct_ingredients(order_id: int):
+    """Trừ nguyên liệu dựa trên công thức (Recipe) của các món trong đơn hàng."""
     try:
-        cleaned = str(raw_value).replace('Z', '+00:00')
-        return datetime.fromisoformat(cleaned)
-    except ValueError:
-        return None
-
+        # 1. Lấy chi tiết các món trong đơn hàng
+        items = execute_query("SELECT productid, quantity FROM OrderDetails WHERE orderid = %s", [order_id], fetch=True)
+        for item in items:
+            product_id = item['productid']
+            qty_sold = item['quantity']
+            
+            # 2. Lấy công thức cho món này
+            recipe = execute_query("SELECT ingredientid, quantityneeded FROM Recipes WHERE productid = %s", [product_id], fetch=True)
+            for r in recipe:
+                ing_id = r['ingredientid']
+                needed_per_unit = float(r['quantityneeded'])
+                total_needed = needed_per_unit * qty_sold
+                
+                # 3. Cập nhật kho nguyên liệu
+                execute_query(
+                    "UPDATE Ingredients SET stockamount = stockamount - %s WHERE ingredientid = %s",
+                    [total_needed, ing_id]
+                )
+        return True
+    except Exception as e:
+        print(f"Lỗi khi trừ nguyên liệu: {e}")
+        return False
 
 def get_all_orders(limit: int = 200):
-    """SELECT tất cả đơn hàng từ bảng Orders (kèm khách hàng)."""
-    sb = get_supabase()
-    response = (
-        sb.table('orders')
-        .select('*, customer:customerid(fullname,email,phone), address:addressid(fulladdress,city)')
-        .order('orderdate', desc=True)
-        .limit(limit)
-        .execute()
-    )
-    return response.data or []
+    sql = """
+        SELECT o.*, u.fullname as customer_name, t.tablenumber 
+        FROM Orders o
+        LEFT JOIN Users u ON o.customerid = u.userid
+        LEFT JOIN Tables t ON o.tableid = t.tableid
+        ORDER BY o.orderdate DESC LIMIT %s
+    """
+    return execute_query(sql, [limit], fetch=True)
 
+def update_order_status(order_id, status, employee_id=None):
+    sql = "UPDATE Orders SET orderstatus = %s"
+    params = [status]
+    if employee_id:
+        sql += ", employeeid = %s"
+        params.append(employee_id)
+    sql += " WHERE orderid = %s"
+    params.append(order_id)
+    return execute_query(sql, params)
 
-def update_order_status(order_id, status, shipper_id=None):
-    """UPDATE trạng thái đơn hàng và ghi nhận thời điểm giao hàng nếu cần."""
-    sb = get_supabase()
-    payload = {'orderstatus': status}
-    if shipper_id:
-        payload['shipperid'] = shipper_id
-        
-    if status == 'shipping':
-        payload['actual_delivery_start'] = 'now()'
-    
-    if status in ['waiting_for_shipper', 'shipping']:
-        # Initialize shipper at store location
-        payload['shipper_lat'] = STORE_COORDS['lat']
-        payload['shipper_lng'] = STORE_COORDS['lng']
-    
-    response = sb.table('orders').update(payload).eq('orderid', order_id).execute()
-    if not response.data:
-        raise RuntimeError(f'Order {order_id} not found or unchanged')
-
-
-def update_shipper_location(order_id: int, lat: float, lng: float):
-    """Update real-time shipper location for an order."""
-    sb = get_supabase()
-    response = sb.table('orders').update({
-        'shipper_lat': lat,
-        'shipper_lng': lng
-    }).eq('orderid', order_id).execute()
-    return bool(response.data)
-
-
-def _fetch_products_map(sb, product_ids: Iterable[int]) -> Dict[int, Dict]:
-    ids = {int(pid) for pid in product_ids if int(pid) > 0}
-    if not ids:
-        return {}
-    query = sb.table('products').select('productid, productname, price').in_('productid', list(ids))
-    resp = query.execute()
-    rows = resp.data or []
-    return {int(row['productid']): row for row in rows}
-
-
-def _ensure_user_address(sb, user_id: int, full_address: str | None, city: str | None, address_id: int | None) -> int | None:
-    if address_id:
-        return address_id
-    if not full_address:
-        return None
-
-    existing = (
-        sb.table('useraddresses')
-        .select('addressid')
-        .eq('userid', user_id)
-        .eq('fulladdress', full_address)
-        .limit(1)
-        .execute()
-    )
-    rows = existing.data or []
-    if rows:
-        return rows[0]['addressid']
-
-    current = sb.table('useraddresses').select('addressid').eq('userid', user_id).execute()
-    set_default = not (current.data or [])
-    insert = sb.table('useraddresses').insert({
-        'userid': user_id,
-        'fulladdress': full_address,
-        'city': city,
-        'isdefault': set_default,
-    }).execute()
-    inserted = insert.data or []
-    return inserted[0]['addressid'] if inserted else None
-
-
-def _resolve_promotion(sb, promo_code: str | None, subtotal: Decimal, shipping_fee: Decimal) -> Tuple[int | None, Decimal, Decimal]:
-    if not promo_code:
-        return None, Decimal('0.00'), shipping_fee
-
-    lookup = (
-        sb.table('promotions')
-        .select('promotionid, discounttype, discountvalue, minorderamount, isactive, startdate, enddate')
-        .eq('code', promo_code.upper())
-        .eq('isactive', True)
-        .limit(1)
-        .execute()
-    )
-    rows = lookup.data or []
-    if not rows:
-        raise ValueError('Promotion code không hợp lệ hoặc đã hết hạn')
-
-    promo = rows[0]
-    now = datetime.now(timezone.utc)
-    start_dt = _parse_iso_datetime(promo.get('startdate'))
-    end_dt = _parse_iso_datetime(promo.get('enddate'))
-    if start_dt and now < start_dt:
-        raise ValueError('Mã khuyến mãi chưa bắt đầu áp dụng')
-    if end_dt and now > end_dt:
-        raise ValueError('Mã khuyến mãi đã hết hạn')
-
-    min_amount = _to_decimal(promo.get('minorderamount') or '0')
-    if subtotal < min_amount:
-        raise ValueError('Đơn hàng chưa đạt giá trị tối thiểu cho mã khuyến mãi')
-
-    promo_value = _to_decimal(promo.get('discountvalue') or '0')
-    discount_type = str(promo.get('discounttype') or '').lower()
-    discount_value = Decimal('0.00')
-    adjusted_shipping = shipping_fee
-
-    if discount_type == 'percent':
-        discount_value = subtotal * promo_value / Decimal('100')
-    elif discount_type == 'flat':
-        discount_value = promo_value
-    elif discount_type == 'delivery':
-        discount_value = shipping_fee if shipping_fee > 0 else promo_value
-        adjusted_shipping = shipping_fee
-    else:
-        raise ValueError('Loại khuyến mãi không được hỗ trợ')
-
-    discount_value = _quantize_money(discount_value)
-    adjusted_shipping = _quantize_money(adjusted_shipping)
-    max_discount = subtotal + adjusted_shipping
-    if discount_value > max_discount:
-        discount_value = max_discount
-
-    return promo['promotionid'], discount_value, adjusted_shipping
-
-
-def create_order(
-    *,
-    customer_id: int,
-    items: List[Dict],
-    shipping_fee=None,
-    promotion_code: str | None = None,
-    delivery_phone: str | None = None,
-    address_id: int | None = None,
-    delivery_address: str | None = None,
-    city: str | None = None,
-    notes: str | None = None,
-    payment_method: str | None = None,
-    customer_name: str | None = None,
-    lat: float | None = None,
-    lng: float | None = None,
-    estimated_eta: str | None = None,
-):
-    if not customer_id:
-        raise ValueError('customer_id is required')
-    if not items or not isinstance(items, list):
-        raise ValueError('items must chứa tối thiểu 1 sản phẩm')
-
-    normalized_items: List[Dict[str, int]] = []
-    for raw in items:
-        try:
-            product_id = int(raw.get('product_id'))
-            quantity = int(raw.get('quantity'))
-        except (TypeError, ValueError):
-            raise ValueError('Mỗi item cần product_id và quantity hợp lệ')
-        if product_id <= 0 or quantity <= 0:
-            raise ValueError('product_id và quantity phải lớn hơn 0')
-        normalized_items.append({'product_id': product_id, 'quantity': quantity})
-
-    sb = get_supabase()
-    products_map = _fetch_products_map(sb, (item['product_id'] for item in normalized_items))
-    missing = [item['product_id'] for item in normalized_items if item['product_id'] not in products_map]
-    if missing:
-        raise ValueError(f'Sản phẩm không tồn tại: {", ".join(map(str, missing))}')
-
+def create_order(*, table_id=None, customer_id=None, employee_id=None, items: List[Dict], promotion_code=None, notes=None, payment_method='Cash'):
+    # 1. Tính toán giá trị đơn hàng
     subtotal = Decimal('0.00')
-    detail_rows = []
-    items_response = []
-    for item in normalized_items:
-        product_row = products_map[item['product_id']]
-        unit_price = _to_decimal(product_row.get('price') or '0')
-        line_total = unit_price * item['quantity']
-        subtotal += line_total
-        detail_rows.append({
-            'productid': item['product_id'],
-            'quantity': item['quantity'],
-            'unitprice': float(_quantize_money(unit_price)),
+    line_items = []
+    
+    for item in items:
+        p_id = item['product_id']
+        qty = item['quantity']
+        product = execute_query("SELECT productname, price FROM Products WHERE productid = %s", [p_id], fetch=True)
+        if not product: continue
+        
+        price = Decimal(str(product[0]['price']))
+        subtotal += price * qty
+        line_items.append({
+            'product_id': p_id,
+            'quantity': qty,
+            'unit_price': price,
+            'note': item.get('note', '')
         })
-        items_response.append({
-            'product_id': item['product_id'],
-            'name': product_row.get('productname') or f'Product {item["product_id"]}',
-            'quantity': item['quantity'],
-            'unit_price': float(_quantize_money(unit_price)),
-        })
+
+    # 2. Xử lý khuyến mãi (đơn giản hóa)
+    discount = Decimal('0.00')
+    promo_id = None
+    if promotion_code:
+        promo = execute_query("SELECT promotionid, discounttype, discountvalue FROM Promotions WHERE code = %s AND isactive = True", [promotion_code.upper()], fetch=True)
+        if promo:
+            promo_id = promo[0]['promotionid']
+            val = Decimal(str(promo[0]['discountvalue']))
+            if promo[0]['discounttype'] == 'percent':
+                discount = subtotal * (val / 100)
+            else:
+                discount = val
 
     subtotal = _quantize_money(subtotal)
-    shipping_decimal = _quantize_money(max(_to_decimal(shipping_fee if shipping_fee is not None else DEFAULT_SHIPPING_FEE, DEFAULT_SHIPPING_FEE), Decimal('0.00')))
-    promotion_id, discount_value, adjusted_shipping = _resolve_promotion(sb, promotion_code, subtotal, shipping_decimal)
-    total_amount = subtotal + adjusted_shipping - discount_value
-    if total_amount < 0:
-        total_amount = Decimal('0.00')
+    discount = _quantize_money(discount)
+    total = subtotal - discount
+    if total < 0: total = Decimal('0.00')
 
-    resolved_address_id = _ensure_user_address(sb, customer_id, delivery_address, city, address_id)
-    order_payload = {
-        'customerid': customer_id,
-        'shipperid': None,
-        'addressid': resolved_address_id,
-        'promotionid': promotion_id,
-        'deliveryphone': delivery_phone,
-        'subtotal': float(subtotal),
-        'shippingfee': float(adjusted_shipping),
-        'discount': float(discount_value),
-        'orderstatus': 'pending',
-        'notes': notes,
-        'latitude': lat,
-        'longitude': lng,
-        'estimated_delivery_time': estimated_eta,
-    }
+    # 3. Tạo đơn hàng
+    sql_order = """
+        INSERT INTO Orders (customerid, tableid, employeeid, promotionid, subtotal, discount, orderstatus, notes)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING orderid
+    """
+    order_data = execute_insert_returning(sql_order, (customer_id, table_id, employee_id, promo_id, float(subtotal), float(discount), 'pending', notes))
+    if not order_data:
+        return None
+    order_id = order_data['orderid']
 
-    order_resp = sb.table('orders').insert(order_payload).execute()
-    created_rows = order_resp.data or []
-    if not created_rows:
-        raise RuntimeError('Không thể tạo đơn hàng')
+    # 4. Tạo chi tiết đơn hàng
+    for li in line_items:
+        execute_query(
+            "INSERT INTO OrderDetails (orderid, productid, quantity, unitprice, ordernote) VALUES (%s, %s, %s, %s, %s)",
+            (order_id, li['product_id'], li['quantity'], float(li['unit_price']), li['note'])
+        )
 
-    created_order = created_rows[0]
-    order_id = created_order['orderid']
-    for row in detail_rows:
-        row['orderid'] = order_id
-    sb.table('orderdetails').insert(detail_rows).execute()
+    # 5. Khởi tạo thanh toán
+    execute_query(
+        "INSERT INTO Payments (orderid, amount, method, status) VALUES (%s, %s, %s, %s)",
+        (order_id, float(_quantize_money(total)), payment_method, 'unpaid')
+    )
 
-    payment_label = PAYMENT_METHOD_MAP.get(str(payment_method or 'cod').lower(), 'Cash')
-    payment_payload = {
-        'orderid': order_id,
-        'amount': float(_quantize_money(total_amount)),
-        'method': payment_label,
-        'status': 'unpaid' if payment_label != 'Card' else 'paid',
-    }
-    sb.table('payments').insert(payment_payload).execute()
+    # 6. TỰ ĐỘNG TRỪ NGUYÊN LIỆU TRONG KHO
+    deduct_ingredients(order_id)
 
-    items_summary = ', '.join(f"{item['name']} x{item['quantity']}" for item in items_response)
-    return {
-        'order_id': order_id,
-        'display_id': _format_display_id(order_id),
-        'customer_id': customer_id,
-        'customer_name': customer_name,
-        'promotion_id': promotion_id,
-        'subtotal': float(subtotal),
-        'shipping_fee': float(adjusted_shipping),
-        'discount': float(discount_value),
-        'total_amount': float(_quantize_money(total_amount)),
-        'items': items_response,
-        'items_summary': items_summary,
-        'order_date': created_order.get('orderdate'),
-        'status': created_order.get('orderstatus', 'pending'),
-        'payment': payment_payload,
-    }
+    # 7. Cập nhật trạng thái bàn nếu có
+    if table_id:
+        execute_query("UPDATE Tables SET status = 'Occupied' WHERE tableid = %s", [table_id])
+
+    return order_id

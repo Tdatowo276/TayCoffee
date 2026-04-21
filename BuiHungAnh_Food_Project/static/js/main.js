@@ -57,7 +57,7 @@ function initFooterMap() {
 
   new mapboxgl.Marker(el)
     .setLngLat([STORE_COORDS.lng, STORE_COORDS.lat])
-    .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML('<h3>ShisaFood</h3><p>Bold flavors, explosive spice.</p>'))
+    .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML('<h3>Tày Coffee</h3><p>Đặc sản cà phê vùng cao.</p>'))
     .addTo(footerMap);
 
   footerMap.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -67,9 +67,9 @@ let isPlacingOrder = false;
 function formatOrderDisplayId(orderId) {
   const numeric = parseInt(orderId, 10);
   if (Number.isNaN(numeric)) {
-    return orderId || '#SF-0001';
+    return orderId || '#TC-0001';
   }
-  return `#SF-${String(numeric).padStart(4, '0')}`;
+  return `#TC-${String(numeric).padStart(4, '0')}`;
 }
 
 function getAppBaseUrl() {
@@ -81,23 +81,23 @@ function getAppBaseUrl() {
 }
 
 const PROMOS = {
-  'SHISA20': { type: 'percent', value: 20, min: 20, desc: '20% off' },
+  'TAYCOFFEE20': { type: 'percent', value: 20, min: 20, desc: '20% off' },
   'FIRE10': { type: 'flat', value: 10, min: 35, desc: '$10 off' },
   'NEWBIE': { type: 'delivery', value: 2.99, min: 0, desc: 'Free delivery' },
 };
 
 const CATEGORIES = [
-  { id: 'noodles', name: 'Noodles', icon: '🍜', desc: 'Spicy Noodles' },
-  { id: 'pizza', name: 'Pizza', icon: '🍕', desc: 'Signature Pizzas' },
-  { id: 'beverages', name: 'Beverages', icon: '🥤', desc: 'Drinks & More' },
-  { id: 'sides', name: 'Sides', icon: '🍟', desc: 'Side Dishes' },
+  { id: 'coffee', name: 'Cà Phê', icon: '☕', desc: 'Đặc sản cà phê vùng cao' },
+  { id: 'tea', name: 'Trà Sữa', icon: '🍵', desc: 'Trà sữa & Trà trái cây' },
+  { id: 'cake', name: 'Bánh Ngọt', icon: '🥐', desc: 'Bánh tươi mỗi ngày' },
+  { id: 'other', name: 'Khác', icon: '🍱', desc: 'Đồ ăn vặt & Khác' },
 ];
 
 let PRODUCTS = []; // Will be loaded from API
 
-const USERS_STORAGE_KEY = 'shisa_users';
-const SESSION_STORAGE_KEY = 'shisa_current_user_email';
-const SESSION_USER_KEY = 'shisa_current_user';
+const USERS_STORAGE_KEY = 'tay_coffee_users';
+const SESSION_STORAGE_KEY = 'tay_coffee_current_user_email';
+const SESSION_USER_KEY = 'tay_coffee_current_user';
 
 let USERS = []; // Will be loaded from API
 
@@ -198,9 +198,9 @@ async function loadProductsFromAPI() {
       PRODUCTS = apiProducts.map((p, idx) => ({
         id: p.productid || idx + 1,
         name: p.productname || 'Unnamed product',
-        cat: p.categoryid === 1 ? 'noodles' : p.categoryid === 2 ? 'pizza' : p.categoryid === 3 ? 'beverages' : 'sides',
+        cat: p.categoryid === 1 ? 'coffee' : p.categoryid === 2 ? 'tea' : p.categoryid === 3 ? 'cake' : 'other',
         price: parseFloat(p.price || 0),
-        emoji: p.emoji || '🍕', // Use emoji from database, fallback to default
+        emoji: p.emoji || (p.categoryid === 1 ? '☕' : p.categoryid === 2 ? '🍵' : p.categoryid === 3 ? '🥐' : '🍱'), 
         desc: p.description || '',
         tags: p.tags ? (typeof p.tags === 'string' ? p.tags.split(',').map(t => t.trim()) : p.tags) : [],
         available: p.isactive !== false,
@@ -287,7 +287,7 @@ async function checkAPIHealth() {
     const health = await APIClient.health();
     if (health.ok) {
       console.log('✅ API Server OK - Database: ' + health.database);
-      document.title = 'ShisaFood ✅ [Connected to ' + health.database + ']';
+      document.title = 'Tày Coffee ✅ [Kết nối ' + health.database + ']';
     }
   } catch (err) {
     console.warn('⚠️ API Server not reachable:', err);
@@ -438,7 +438,7 @@ function productCard(p) {
       <div class="product-name">${p.name}</div>
       <div class="product-desc">${p.desc.substring(0, 70)}...</div>
       <div class="product-meta">
-        <div class="product-price">$${p.price.toFixed(2)}<span class="currency">USD</span></div>
+        <div class="product-price">${p.price.toLocaleString('vi-VN')}<span class="currency">VNĐ</span></div>
         <div class="product-rating"><span class="stars" style="font-size:11px">${stars}</span> ${p.rating}</div>
       </div>
       <div class="product-actions" onclick="event.stopPropagation()">
@@ -608,29 +608,18 @@ async function login() {
     return;
   }
 
-  if (window.SupabaseWeb) {
-    try {
-      await window.SupabaseWeb.signIn(email, pass);
-      state.currentUser = await resolveProfileByEmail(email);
-      onLoginSuccess(true);
-      closeModal('login-modal');
-      return;
-    } catch (err) {
-      console.warn('Supabase login failed, fallback to app auth:', err);
-    }
-  }
-
+  // Simple direct Tày Coffee Login (PostgreSQL Local)
   try {
     const data = await APIClient.login(email, pass);
     if (!data.ok) {
-      showToast(data.error || 'Login failed', 'error');
+      showToast(data.error || 'Đăng nhập thất bại', 'error');
       return;
     }
     state.currentUser = data.user;
     onLoginSuccess(true);
     closeModal('login-modal');
   } catch (err) {
-    showToast(err.message || 'Cannot connect to auth API', 'error');
+    showToast(err.message || 'Không thể kết nối đến hệ thống xác thực', 'error');
   }
 }
 
@@ -993,11 +982,11 @@ function initCheckoutMap() {
   const storeEl = document.createElement('div');
   storeEl.className = 'store-marker';
   storeEl.style.fontSize = '32px';
-  storeEl.innerHTML = '🏬';
+  storeEl.innerHTML = '';
 
   new mapboxgl.Marker(storeEl)
     .setLngLat([STORE_COORDS.lng, STORE_COORDS.lat])
-    .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML('<h3>ShisaFood - Store</h3><p>Your meal starts here!</p>'))
+    .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML('<h3>Tày Coffee - Cửa hàng</h3><p>Gọi ngay, phục vụ ngay!</p>'))
     .addTo(checkoutMap);
 
   checkoutMarker = new mapboxgl.Marker({ draggable: true, color: '#e8000d' })

@@ -38,13 +38,13 @@ def handle_social_login(user_info, provider_name):
     <html>
     <head>
         <script>
-            localStorage.setItem('shisa_current_user_email', '{user['email']}');
-            localStorage.setItem('shisa_current_user', JSON.stringify({{
+            localStorage.setItem('tay_coffee_current_user_email', '{user['email']}');
+            localStorage.setItem('tay_coffee_current_user', JSON.stringify({{
                 "id": "{user['userid']}",
                 "name": "{user['fullname']}",
                 "email": "{user['email']}",
-                "role": "customer",
-                "role_id": 3
+                "role": "staff",
+                "role_id": {user['roleid']}
             }}));
             window.location.href = '/';
         </script>

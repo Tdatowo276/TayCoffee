@@ -12,7 +12,7 @@ const CUSTOMER_STATE = {
     addresses: [],
 };
 
-const SESSION_USER_KEY = 'shisa_current_user';
+const SESSION_USER_KEY = 'tay_coffee_current_user';
 const DELIVERY_PAGE_SIZE = 3;
 
 let customerOrdersPollingHandle = null;
@@ -47,7 +47,7 @@ function toast(message, type = 'info') {
 }
 
 function formatMoney(value) {
-    return `$${Number(value || 0).toFixed(2)}`;
+    return `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
 }
 
 function formatOrderDisplayId(dbId) {
@@ -303,7 +303,7 @@ function initTrackerMap(order) {
         const storeEl = document.createElement('div');
         storeEl.className = 'store-marker';
         storeEl.style.fontSize = '30px';
-        storeEl.innerHTML = '🏬';
+        storeEl.innerHTML = '';
         new mapboxgl.Marker(storeEl)
             .setLngLat([STORE_COORDS.lng, STORE_COORDS.lat])
             .addTo(trackerMap);

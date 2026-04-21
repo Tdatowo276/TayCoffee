@@ -11,14 +11,14 @@ const SHIPPER_STATE = {
     doneOrders: [], // Will load from API
 };
 
-const SESSION_USER_KEY = 'shisa_current_user';
-const SESSION_STORAGE_KEY = 'shisa_current_user_email';
+const SESSION_USER_KEY = 'tay_coffee_current_user';
+const SESSION_STORAGE_KEY = 'tay_coffee_current_user_email';
 
 let unsubscribeOrdersRealtime = null;
 let ordersPollingHandle = null;
 
 const MAPBOX_ACCESS_TOKEN = window.MAPBOX_ACCESS_TOKEN || '';
-const STORE_COORDS = { lat: 51.5033, lng: -0.1182 }; // 10 York Road, London
+const STORE_COORDS = { lat: 21.0285, lng: 105.8542 }; // Hoàn Kiếm, Hà Nội
 
 let simulationMap = null;
 let simulationMarker = null;
@@ -36,11 +36,11 @@ function shipperToast(message, type = 'info') {
 }
 
 function money(v) {
-    return `$${Number(v).toFixed(2)}`;
+    return `${Number(v).toLocaleString('vi-VN')}₫`;
 }
 
 function formatOrderDisplayId(dbId) {
-    return `#SF-${String(dbId).padStart(4, '0')}`;
+    return `#TC-${String(dbId).padStart(4, '0')}`;
 }
 
 function mapApiOrder(order) {
@@ -50,7 +50,7 @@ function mapApiOrder(order) {
         id: formatOrderDisplayId(order.orderid),
         customer: order.customer?.fullname || `Customer #${order.customerid || '—'}`,
         phone: order.deliveryphone || 'N/A',
-        pickup: '10 York Road, London SE1 7ND',
+        pickup: '123 Đường Cà Phê, Hoàn Kiếm, Hà Nội',
         dropoff: order.address?.fulladdress || 'Customer address',
         items: [order.items_summary || 'Order details'],
         subtotal: Number(order.subtotal || 0),
@@ -394,14 +394,14 @@ function initSimulationMap(orders) {
         zoom: 14
     });
 
-    // Store Marker (ShisaFood HQ)
+    // Store Marker (Tày Coffee HQ)
     const storeEl = document.createElement('div');
     storeEl.className = 'store-marker';
     storeEl.style.fontSize = '32px';
     storeEl.innerHTML = '';
     new mapboxgl.Marker(storeEl)
         .setLngLat([STORE_COORDS.lng, STORE_COORDS.lat])
-        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML('<h3>ShisaFood</h3><p>Order departs here</p>'))
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML('<h3>Tày Coffee</h3><p>Order departs here</p>'))
         .addTo(simulationMap);
 
     // Moto Marker

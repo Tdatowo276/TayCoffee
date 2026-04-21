@@ -15,8 +15,8 @@ const ADMIN_DATA = {
   ],
 };
 
-const SESSION_USER_KEY = "shisa_current_user";
-const SESSION_STORAGE_KEY = "shisa_current_user_email";
+const SESSION_USER_KEY = "tay_coffee_current_user";
+const SESSION_STORAGE_KEY = "tay_coffee_current_user_email";
 
 const STATUS_MAP = {
   pending: { label: "Pending", cls: "sbadge-warning" },
@@ -29,7 +29,7 @@ const STATUS_MAP = {
 let unsubscribeOrdersRealtime = null;
 let editingId = null;
 let editingUserId = null;
-let editingUserRole = "customer";
+let editingUserRole = "staff";
 const filterTimers = {};
 
 
@@ -131,7 +131,7 @@ function adminToast(msg, type = "info") {
 }
 
 function formatOrderDisplayId(dbId) {
-  return `#SF-${String(dbId).padStart(4, "0")}`;
+  return `#TC-${String(dbId).padStart(4, "0")}`;
 }
 
 function parseAmount(v) {
@@ -141,10 +141,10 @@ function parseAmount(v) {
 
 function mapCategory(categoryId) {
   const n = Number(categoryId);
-  if (n === 1) return "noodles";
-  if (n === 2) return "pizza";
-  if (n === 3) return "beverages";
-  return "sides";
+  if (n === 1) return "☕ Cà phê";
+  if (n === 2) return "🍵 Trà";
+  if (n === 3) return "🧁 Bánh ngọt";
+  return "📦 Khác";
 }
 
 function showPanel(id, el) {
@@ -194,8 +194,8 @@ async function loadAdminDataFromAPI() {
         [products, orders, customerUsers, shipperUsers] = await Promise.all([
           APIClient.getProducts(300),
           APIClient.getOrders(300),
-          APIClient.getAdminUsers("customer", 300),
-          APIClient.getAdminUsers("shipper", 300),
+          APIClient.getAdminUsers("staff", 300),
+          APIClient.getAdminUsers("cashier", 300),
         ]);
       } else {
         console.log(
@@ -204,8 +204,8 @@ async function loadAdminDataFromAPI() {
         [products, orders, customerUsers, shipperUsers] = await Promise.all([
           fetchItems("/products", 300),
           fetchItems("/orders", 300),
-          fetchAdminUsers("customer", 300),
-          fetchAdminUsers("shipper", 300),
+          fetchAdminUsers("staff", 300),
+          fetchAdminUsers("cashier", 300),
         ]);
       }
       console.log(
@@ -336,7 +336,7 @@ function renderStats() {
     const statShippers = document.getElementById("stat-shippers");
 
     if (statRevenue)
-      statRevenue.textContent = "$" + deliveredRevenue.toFixed(2);
+      statRevenue.textContent = deliveredRevenue.toLocaleString('vi-VN') + "₫";
     if (statOrders) statOrders.textContent = ADMIN_DATA.orders.length;
     if (statUsers) statUsers.textContent = ADMIN_DATA.users.length;
     if (statShippers) statShippers.textContent = ADMIN_DATA.shippers.length;
@@ -393,7 +393,7 @@ function renderRecentOrders() {
         <td>${o.id}</td>
         <td>${o.customer}</td>
         <td class="muted">${o.items}</td>
-        <td>$${parseAmount(o.total).toFixed(2)}</td>
+        <td>${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
         <td><span class="sbadge ${s.cls}">${s.label}</span></td>
         <td class="muted">${o.date}</td>
       </tr>`;
@@ -427,7 +427,7 @@ function renderProducts() {
         (p) => `<tr>
       <td>${p.name}</td>
       <td>${p.cat}</td>
-      <td>$${p.price.toFixed(2)}</td>
+      <td>${p.price.toLocaleString('vi-VN')}₫</td>
       <td><span class="sbadge ${p.available ? "sbadge-success" : "sbadge-danger"}">${p.available ? "In stock" : "Out of stock"}</span></td>
       <td></td>
       <td><div class="abtns">
@@ -477,7 +477,7 @@ function renderOrders() {
         <td>${o.id}</td>
         <td>${o.customer}</td>
         <td class="muted">${o.items}</td>
-        <td>$${parseAmount(o.total).toFixed(2)}</td>
+        <td>${parseAmount(o.total).toLocaleString('vi-VN')}₫</td>
         <td>${o.shipper}</td>
         <td>
           <span class="sbadge ${s.cls}">${s.label}</span>
@@ -664,7 +664,7 @@ function openProductModal(id = null) {
     document.getElementById("p-name").value = "";
     document.getElementById("p-price").value = "";
     document.getElementById("p-desc").value = "";
-    document.getElementById("p-cat").value = "noodles";
+    document.getElementById("p-cat").value = "1";
     document.getElementById("p-emoji").value = "";
     document.getElementById("p-avail").value = "true";
     document.getElementById("p-tags").value = "";
@@ -777,7 +777,7 @@ async function saveProduct() {
 }
 
 function getUserCollection(role) {
-  return role === "shipper" ? ADMIN_DATA.shippers : ADMIN_DATA.users;
+  return role === "cashier" ? ADMIN_DATA.shippers : ADMIN_DATA.users;
 }
 
 function openUserModal(role = "customer", userId = null) {
@@ -794,11 +794,11 @@ function openUserModal(role = "customer", userId = null) {
   const badge = document.getElementById("u-status-pill");
   const submitBtn = document.getElementById("user-modal-submit");
 
-  const roleLabel = role === "shipper" ? "Shipper" : "Customer";
+  const roleLabel = role === "cashier" ? "Thu ngân" : "Nhân viên";
   if (title) title.textContent = `${userId ? "Update" : "Create"} ${roleLabel}`;
   if (badge) {
     badge.textContent = roleLabel;
-    badge.className = `sbadge ${role === "shipper" ? "sbadge-info" : "sbadge-success"}`;
+    badge.className = `sbadge ${role === "cashier" ? "sbadge-info" : "sbadge-success"}`;
   }
 
   const existing = userId
@@ -921,9 +921,9 @@ function openOrderDetails(orderId) {
     'order-detail-id': order.id,
     'order-detail-customer': order.customer,
     'order-detail-shipper': order.shipper,
-    'order-detail-subtotal': `$${parseAmount(order.subtotal).toFixed(2)}`,
-    'order-detail-shipping': `$${parseAmount(order.shipping).toFixed(2)}`,
-    'order-detail-total': `$${parseAmount(order.total).toFixed(2)}`,
+    'order-detail-subtotal': `${parseAmount(order.subtotal).toLocaleString('vi-VN')}₫`,
+    'order-detail-shipping': `${parseAmount(order.shipping).toLocaleString('vi-VN')}₫`,
+    'order-detail-total': `${parseAmount(order.total).toLocaleString('vi-VN')}₫`,
     'order-detail-status': order.status,
     'order-detail-date': order.date,
     'order-detail-items': order.items || '-',
@@ -954,11 +954,10 @@ function updateClock() {
   });
 }
 
-async function initOrdersRealtime() {
-  if (!window.SupabaseWeb) return;
-  try {
-    unsubscribeOrdersRealtime = await window.SupabaseWeb.subscribeOrders(async () => {
-      console.log('[Admin] Realtime update received!');
+function initPollingRefresh() {
+  // Poll every 30s for updates (replaces Supabase realtime for local LAN)
+  setInterval(async () => {
+    try {
       await loadAdminDataFromAPI();
       renderStats();
       renderRecentOrders();
@@ -967,26 +966,13 @@ async function initOrdersRealtime() {
       renderUsers();
       renderShippers();
       renderPromos();
-    });
-  } catch (err) {
-    adminToast(`Realtime disabled: ${err.message || err}`, "info");
-  }
-
-
+    } catch (err) {
+      console.warn('[Admin] Polling refresh failed:', err);
+    }
+  }, 30000);
 }
 
 async function logout() {
-  try {
-    if (
-      window.SupabaseWeb &&
-      typeof window.SupabaseWeb.signOut === "function"
-    ) {
-      await window.SupabaseWeb.signOut();
-    }
-  } catch (err) {
-    console.warn("[Admin] Supabase signOut failed:", err);
-  }
-
   try {
     localStorage.removeItem(SESSION_USER_KEY);
     localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -994,7 +980,7 @@ async function logout() {
     console.warn("[Admin] Failed to clear session storage:", err);
   }
 
-  adminToast("Logged out. See you soon!", "info");
+  adminToast("Đã đăng xuất. Hẹn gặp lại!", "info");
   setTimeout(() => {
     window.location.href = "/index.html";
   }, 800);
@@ -1019,8 +1005,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateClock();
     setInterval(updateClock, 1000);
 
-    console.log('[Admin] Initializing realtime subscriptions...');
-    await initOrdersRealtime();
+    console.log('[Admin] Initializing polling refresh...');
+    initPollingRefresh();
     console.log("[Admin] Dashboard fully loaded!");
   } catch (err) {
     console.error("[Admin] DOMContentLoaded error:", err);
@@ -1031,8 +1017,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-window.addEventListener("beforeunload", () => {
-  if (typeof unsubscribeOrdersRealtime === "function") {
-    unsubscribeOrdersRealtime();
-  }
-});
+// No cleanup needed - polling stops automatically on page unload
